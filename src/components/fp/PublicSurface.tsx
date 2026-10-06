@@ -289,7 +289,6 @@ export function PublicSurface() {
             <BeforeAfter />
           </div>
           <Reviews />
-          </div>
         </div>
       </section>
       <Faq />
