@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
+import { AdminTools } from "./AdminTools";
 
 const KPIS = [
   { label: "Revenue (Nov)", value: "$18,420", delta: "+12.4%", up: true, icon: DollarSign },
@@ -152,6 +153,7 @@ export function AdminSurface() {
           ))}
         </div>
       </div>
+      <AdminTools />
     </div>
   );
 }

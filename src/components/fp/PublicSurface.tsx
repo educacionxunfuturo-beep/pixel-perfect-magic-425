@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check, ChevronLeft, ChevronRight, Search, MapPin, Star, ShieldCheck, Leaf, Heart, Ban, Info, Clock, Sparkles,
 } from "lucide-react";
@@ -7,6 +7,7 @@ import beforeImg from "@/assets/before.jpg";
 import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
+import { Packages, PressBanner, Reviews, Faq, PACKAGES, type PackageId } from "./PublicSections";
 
 const BREEDS = [
   { name: "Goldendoodle", factor: 1.15 },
@@ -46,8 +47,17 @@ const ZONES: Record<string, { area: string; day: string }> = {
   M5V: { area: "King West", day: "Mondays" },
 };
 
-function QuoteWizard() {
+function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }) {
   const [step, setStep] = useState(1);
+  const [pkgId, setPkgId] = useState<PackageId>("full");
+  useEffect(() => {
+    if (!preset) return;
+    setPkgId(preset.id);
+    setBreed(preset.id === "ultimate" ? "Golden Retriever" : preset.id === "tidy" ? "French Bulldog" : "Goldendoodle");
+    setWeight(preset.id === "ultimate" ? "l" : preset.id === "tidy" ? "s" : "m");
+    setStep(1);
+  }, [preset]);
+  const pkg = PACKAGES.find((p) => p.id === pkgId)!;
   const [breed, setBreed] = useState("Goldendoodle");
   const [q, setQ] = useState("");
   const [weight, setWeight] = useState("m");
@@ -64,7 +74,7 @@ function QuoteWizard() {
   }, [postal]);
 
   const breedF = BREEDS.find((b) => b.name === breed)?.factor ?? 1;
-  const base = Math.round((WEIGHTS.find((w) => w.id === weight)!.base * breedF) / 5) * 5;
+  const base = Math.max(pkg.from + (pkgId === "ultimate" ? 0 : 0), Math.round((WEIGHTS.find((w) => w.id === weight)!.base * breedF) / 5) * 5 + (pkgId === "ultimate" ? 100 : pkgId === "tidy" ? -10 : 0));
   const coatAdd = COATS.find((c) => c.id === coat)!.add;
   const addonTotal = ADDONS.filter((a) => addons.includes(a.id)).reduce((s, a) => s + a.price, 0);
   const discount = sibling ? 20 : 0;
@@ -79,7 +89,7 @@ function QuoteWizard() {
         <div className="flex items-center justify-between">
           <div>
             <div className="eyebrow text-gold">Instant Quote</div>
-            <h3 className="text-2xl font-semibold">Your pooch's spa day</h3>
+            <h3 className="text-2xl font-semibold">{pkg.name}</h3>
           </div>
           <div className="text-right">
             <div className="text-xs opacity-75">Step {step} of 5</div>
@@ -166,10 +176,10 @@ function QuoteWizard() {
           <div>
             <div className="flex items-end justify-between">
               <div>
-                <div className="text-sm text-muted-foreground">Signature Spa Package • {breed}</div>
+                <div className="text-sm text-muted-foreground">{pkg.name} • {breed}</div>
                 <div className="font-serif text-4xl font-semibold text-teal">${total} <span className="text-base font-sans text-muted-foreground">CAD</span></div>
               </div>
-              <Pill tone="gold">Range $140 – $190 base</Pill>
+              <Pill tone="gold">{pkg.price} CAD</Pill>
             </div>
             <div className="mt-4 space-y-2">
               {ADDONS.map((a) => {
@@ -231,13 +241,12 @@ function BeforeAfter() {
   );
 }
 
-const REVIEWS = [
-  { name: "Priya S.", area: "Leaside", text: "Our anxious Maltese used to shake at salons. In the trailer she was calm the whole time. Unreal service.", dog: "Maltese" },
-  { name: "Marcus T.", area: "Yonge & Eglinton", text: "Booking took a minute, the van was on time, and Bentley came out looking like a teddy bear. 10/10.", dog: "Goldendoodle" },
-  { name: "Hannah L.", area: "The Annex", text: "The salt paw treatment is a game changer in January. The report card with photos is such a nice touch.", dog: "Golden Retriever" },
-];
-
 export function PublicSurface() {
+  const [preset, setPreset] = useState<{ id: PackageId; n: number } | null>(null);
+  const select = (id: PackageId) => {
+    setPreset((p) => ({ id, n: (p?.n ?? 0) + 1 }));
+    document.getElementById("quote")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
     <div className="animate-fade-up">
       <section className="mx-auto grid max-w-7xl gap-10 px-4 py-10 md:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
@@ -266,34 +275,23 @@ export function PublicSurface() {
             </div>
           </div>
         </div>
-        <div className="lg:sticky lg:top-24 lg:self-start">
-          <QuoteWizard />
+        <div id="quote" className="scroll-mt-24 lg:sticky lg:top-24 lg:self-start">
+          <QuoteWizard preset={preset} />
         </div>
       </section>
 
+      <Packages onSelect={select} />
+      <PressBanner />
       <section className="border-t border-border bg-secondary/50">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:px-6 lg:grid-cols-2">
           <div>
             <SectionTitle eyebrow="The Transformation" title="Slide to see the magic" sub="Real results from our trailer tub. Drag the handle." />
             <BeforeAfter />
           </div>
-          <div>
-            <SectionTitle eyebrow="Loved by the 6ix" title="Five stars, every street" />
-            <div className="space-y-4">
-              {REVIEWS.map((r) => (
-                <div key={r.name} className="card-surface p-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-amber text-amber" />)}</div>
-                    <span className="text-xs font-semibold text-muted-foreground">Google</span>
-                  </div>
-                  <p className="mt-3 font-serif text-lg leading-snug">“{r.text}”</p>
-                  <div className="mt-3 text-sm text-muted-foreground"><strong className="text-foreground">{r.name}</strong> • {r.area} • {r.dog} parent</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Reviews />
         </div>
       </section>
+      <Faq />
     </div>
   );
 }
