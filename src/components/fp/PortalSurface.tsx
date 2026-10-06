@@ -53,7 +53,7 @@ function GroomTracker() {
             );
           })}
         </div>
-        <div className="mt-4 rounded-xl bg-muted p-3 text-sm"><strong>{STAGES[stage].label}:</strong> {STAGES[stage].sub}</div>
+        <div className="mt-4 rounded-xl bg-muted p-3 text-sm"><strong>{STAGES[stage]!.label}:</strong> {STAGES[stage]!.sub}</div>
       </div>
     </div>
   );
