@@ -8,6 +8,8 @@ import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { Packages, PressBanner, Reviews, Faq, PACKAGES, type PackageId } from "./PublicSections";
+import { SpaReels } from "./SpaReels";
+import { ClientGallery } from "./ClientGallery";
 
 const BREEDS = [
   { name: "Goldendoodle", factor: 1.15 },
@@ -277,7 +279,7 @@ export function PublicSurface() {
               className="aspect-[16/10] w-full object-cover transition-transform duration-700 hover:scale-[1.02]"
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-card/95 px-3 py-1.5 text-xs font-bold backdrop-blur shadow-sm">
-              <Star className="h-3.5 w-3.5 fill-amber text-amber" /> 4.9 • 312 Google reviews
+              <Star className="h-3.5 w-3.5 fill-amber text-amber" /> 5.0 • 600+ Happy Toronto Pooches
             </div>
             <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1 text-xs font-semibold text-teal backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
@@ -294,15 +296,17 @@ export function PublicSurface() {
 
       <Packages onSelect={select} />
       <PressBanner />
+      <SpaReels />
       <section className="border-t border-border bg-secondary/50">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:px-6 lg:grid-cols-2">
           <div>
-            <SectionTitle eyebrow="The Transformation" title="Slide to see the magic" sub="Real results from our trailer tub. Drag the handle." />
+            <SectionTitle eyebrow="The Transformation" title="Slide to see the magic" sub="Real results from our trailer tub. Welsh Terrier full groom & scissor styling." />
             <BeforeAfter />
           </div>
           <Reviews />
         </div>
       </section>
+      <ClientGallery />
       <Faq />
     </div>
   );

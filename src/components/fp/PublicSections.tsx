@@ -62,20 +62,20 @@ const REVIEWS = [
 export function Reviews() {
   return (
     <div>
-      <SectionTitle eyebrow="Google Reviews" title="4.9 out of 5 Stars" sub="312+ Verified Google Reviews from Toronto pet parents." />
+      <SectionTitle eyebrow="Toronto Client Love" title="5.0 Star Experience" sub="Over 600+ happy dogs pampered right at their doorstep across Toronto." />
       <div className="space-y-4">
         {REVIEWS.map((r) => (
           <div key={r.name} className="card-surface p-5">
             <div className="flex items-center justify-between">
               <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-amber text-amber" />)}</div>
-              <span className="text-xs font-semibold text-muted-foreground">Google</span>
+              <span className="text-xs font-semibold text-teal">Verified Client</span>
             </div>
             <p className="mt-3 font-serif text-lg leading-snug">“{r.text}”</p>
             <div className="mt-3 text-sm text-muted-foreground"><strong className="text-foreground">{r.name}</strong> • {r.area} • {r.dog}</div>
           </div>
         ))}
       </div>
-      <a href="https://www.google.com/search?q=The+Fresh+Pooch+Toronto+reviews" target="_blank" rel="noreferrer" className="mt-5 inline-flex rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold hover:border-sage">Read all 312 Google Reviews / Leave a Review</a>
+      <a href="https://instagram.com/thefreshpooch" target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal hover:bg-teal/5 transition-colors"><Instagram className="h-4 w-4" /> See More Real Stories @thefreshpooch</a>
     </div>
   );
 }
@@ -124,7 +124,7 @@ export function SiteFooter() {
         <div className="space-y-2">
           <div className="eyebrow text-gold">Contact</div>
           <a href="tel:+16474511747" className="flex items-center gap-2 hover:text-teal"><Phone className="h-4 w-4" /> (647) 451-1747</a>
-          <a href="mailto:hello@thefreshpooch.ca" className="flex items-center gap-2 hover:text-teal"><Mail className="h-4 w-4" /> hello@thefreshpooch.ca</a>
+          <a href="mailto:Hello@DogGroomingToronto.ca" className="flex items-center gap-2 hover:text-teal"><Mail className="h-4 w-4" /> Hello@DogGroomingToronto.ca</a>
         </div>
         <div className="space-y-2">
           <div className="eyebrow text-gold">Hours</div>
