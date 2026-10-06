@@ -27,7 +27,7 @@ export function GroomerSurface() {
   const [report, setReport] = useState<Record<string, string>>({ coat: "Silky", ears: "Clean & Fresh", nails: "Clipped & Buffed" });
   const [photos, setPhotos] = useState<{ before?: string; after?: string }>({});
   const [sent, setSent] = useState(false);
-  const stop = STOPS[active];
+  const stop = STOPS[active]!;
 
   const onPhoto = (k: "before" | "after", f?: File) => f && setPhotos((p) => ({ ...p, [k]: URL.createObjectURL(f) }));
 
