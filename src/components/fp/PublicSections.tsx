@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Star, ChevronDown, Newspaper, ShieldCheck, Leaf, Award, Phone, Mail, Clock, MapPin, Instagram } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Pill, SectionTitle } from "./primitives";
+import { Pill, SectionTitle, BrandLogo } from "./primitives";
 
 export type PackageId = "tidy" | "full" | "ultimate";
 export const PACKAGES: { id: PackageId; name: string; price: string; from: number; best: string; includes: string[]; popular?: boolean }[] = [
@@ -113,10 +113,14 @@ export function SiteFooter() {
     <footer className="border-t border-border bg-secondary/40">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 text-sm md:grid-cols-4 md:px-6">
         <div>
-          <div className="font-serif text-xl font-semibold text-teal">The Fresh Pooch</div>
+          <div className="flex items-center gap-2.5">
+            <BrandLogo className="h-9 w-9" />
+            <div className="font-serif text-xl font-semibold text-teal">The Fresh Pooch</div>
+          </div>
           <p className="mt-2 text-muted-foreground">Toronto's vintage luxury mobile dog spa. Licensed & insured • Organic products only.</p>
           <a href="https://instagram.com/thefreshpooch" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 font-semibold text-teal"><Instagram className="h-4 w-4" /> @thefreshpooch</a>
         </div>
+
         <div className="space-y-2">
           <div className="eyebrow text-gold">Contact</div>
           <a href="tel:+16474511747" className="flex items-center gap-2 hover:text-teal"><Phone className="h-4 w-4" /> (647) 451-1747</a>

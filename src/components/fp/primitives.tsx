@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import logoImg from "@/assets/original-hero.png";
+import logoImg from "@/assets/official-logo.png";
 
 export function BrandLogo({ className }: { className?: string }) {
   return (
     <img
       src={logoImg}
       alt="The Fresh Pooch official logo"
-      className={cn("h-10 w-10 object-contain rounded-full bg-white p-0.5 shadow-sm", className)}
+      className={cn("h-10 w-10 object-contain rounded-full bg-white p-0.5 shadow-sm border border-border/40", className)}
     />
   );
 }
+
 
 export function Chip({
   active,

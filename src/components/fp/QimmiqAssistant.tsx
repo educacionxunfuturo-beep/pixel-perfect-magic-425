@@ -40,11 +40,20 @@ export function QimmiqAssistant() {
   const [mode, setMode] = useState<Mode>("client");
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [welcomeToast, setWelcomeToast] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
     { from: "ai", text: "Woof! I'm Qimmiq, your Canadian Dog Service AI. How can I help you and your pooch today? 🐾" },
   ]);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
+
+  useEffect(() => {
+    // Show welcoming speech bubble 1.5 seconds after page loads
+    const timer = setTimeout(() => {
+      setWelcomeToast(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const send = async (text: string) => {
     const t = text.trim();
@@ -70,8 +79,61 @@ export function QimmiqAssistant() {
 
   return (
     <>
+      {/* Welcome Speech Bubble */}
+      {welcomeToast && !open && (
+        <div className="animate-fade-up fixed bottom-20 right-5 z-40 max-w-xs rounded-2xl border border-gold/40 bg-card/95 p-4 shadow-lift backdrop-blur-md">
+          <div className="flex items-start gap-3">
+            <img
+              src={qimmiqAvatar}
+              alt="Qimmiq"
+              className="h-9 w-9 rounded-full border-2 border-gold object-cover shrink-0 shadow-sm"
+            />
+            <div className="flex-1 text-left">
+              <div className="flex items-center justify-between">
+                <span className="font-serif text-xs font-bold text-teal flex items-center gap-1">
+                  <Sparkles className="h-3 w-3 text-gold" /> Qimmiq AI Concierge
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWelcomeToast(false);
+                  }}
+                  className="text-muted-foreground hover:text-foreground text-xs p-0.5 rounded transition-colors"
+                  aria-label="Cerrar mensaje"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <p
+                className="mt-1 text-xs text-foreground leading-relaxed cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => {
+                  setOpen(true);
+                  setWelcomeToast(false);
+                }}
+              >
+                👋 <strong>¡Hola!</strong> Soy <strong>Qimmiq</strong>. Pregúntame sobre precios para la raza de tu perro, qué incluye cada paquete de spa o cómo reservar en Toronto. 🐾
+              </p>
+              <button
+                onClick={() => {
+                  setOpen(true);
+                  setWelcomeToast(false);
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[0.72rem] font-bold text-teal hover:underline"
+              >
+                Chatear con Qimmiq &rarr;
+              </button>
+            </div>
+          </div>
+          {/* Bubble tail */}
+          <div className="absolute -bottom-2 right-8 h-3.5 w-3.5 rotate-45 border-b border-r border-gold/40 bg-card" />
+        </div>
+      )}
+
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          setWelcomeToast(false);
+        }}
         className={cn(
           "bg-gradient-teal fixed bottom-5 right-5 z-40 flex items-center gap-3 rounded-full pl-2 pr-5 py-2 text-sm font-bold text-primary-foreground shadow-lift transition-transform hover:scale-105 border border-gold/30",
           open && "hidden",
@@ -95,6 +157,7 @@ export function QimmiqAssistant() {
           <span className="text-sm">Ask Qimmiq</span>
         </div>
       </button>
+
 
       {open && <div className="fixed inset-0 z-40 bg-ink/30 backdrop-blur-sm" onClick={() => setOpen(false)} />}
       <aside
