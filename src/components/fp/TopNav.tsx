@@ -1,6 +1,6 @@
 import { Globe, PawPrint, Truck, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PawLogo } from "./primitives";
+import { BrandLogo } from "./primitives";
 
 export type Surface = "public" | "portal" | "groomer" | "admin";
 
@@ -16,7 +16,7 @@ export function TopNav({ surface, onChange }: { surface: Surface; onChange: (s: 
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3 md:px-6">
         <button onClick={() => onChange("public")} className="flex items-center gap-2.5">
-          <PawLogo className="h-9 w-9" />
+          <BrandLogo className="h-10 w-10" />
           <div className="text-left leading-tight">
             <div className="font-serif text-lg font-semibold text-teal">The Fresh Pooch</div>
             <div className="eyebrow text-[0.6rem] text-muted-foreground">Mobile Dog Spa & OS</div>

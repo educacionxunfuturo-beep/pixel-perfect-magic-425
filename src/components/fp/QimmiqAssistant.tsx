@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 
 type Mode = "client" | "admin";
 type Msg = { from: "user" | "ai"; text: string };
@@ -44,17 +45,28 @@ export function QimmiqAssistant() {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const t = text.trim();
     if (!t) return;
     setMsgs((m) => [...m, { from: "user", text: t }]);
     setInput("");
     setTyping(true);
-    setTimeout(() => {
+
+    try {
+      const res = await api.qimmiq.chat({
+        message: t,
+        mode: mode === "client" ? "CLIENT_CONCIERGE" : "ADMIN_COPILOT",
+      });
+      const responseText = res.message || res.reply || res.text || reply(t, mode);
+      setMsgs((m) => [...m, { from: "ai", text: responseText }]);
+    } catch {
+      // Fallback seamlessly to local intelligent reply if backend is offline
       setMsgs((m) => [...m, { from: "ai", text: reply(t, mode) }]);
+    } finally {
       setTyping(false);
-    }, 700);
+    }
   };
+
 
   return (
     <>

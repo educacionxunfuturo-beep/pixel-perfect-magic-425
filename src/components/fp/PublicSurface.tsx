@@ -3,6 +3,8 @@ import {
   Check, ChevronLeft, ChevronRight, Search, MapPin, Star, ShieldCheck, Leaf, Heart, Ban, Info, Clock, Sparkles,
 } from "lucide-react";
 import hero from "@/assets/hero-trailer.jpg";
+import realTrailer from "@/assets/real-trailer.png";
+import brandLogo from "@/assets/original-hero.png";
 import beforeImg from "@/assets/before.jpg";
 import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
@@ -268,13 +270,38 @@ export function PublicSurface() {
               <span key={t} className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold"><I className="h-4 w-4 text-teal" />{t}</span>
             ))}
           </div>
-          <div className="relative mt-8 overflow-hidden rounded-3xl shadow-lift">
-            <img src={hero} alt="The Fresh Pooch vintage trailer with a goldendoodle" width={1264} height={848} className="aspect-[16/10] w-full object-cover" />
-            <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-card/95 px-3 py-1.5 text-xs font-bold backdrop-blur">
-              <Star className="h-3.5 w-3.5 fill-amber text-amber" /> 4.9 • 312 Google reviews
+          <div className="relative mt-8 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-[#2E4F4F]/10 via-[#FAF8F5] to-[#E09F3E]/15 p-6 shadow-lift trailer-rivets">
+            <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <img src={brandLogo} alt="Logo" className="h-7 w-7 rounded-full" />
+                <span className="font-serif text-sm font-bold text-teal">Our Authentic Custom Mobile Spa</span>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-[0.7rem] font-bold text-success">
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" /> 100% Autonomous
+              </span>
+            </div>
+            
+            <div className="relative flex items-center justify-center py-6">
+              <img
+                src={realTrailer}
+                alt="The Fresh Pooch official custom mobile trailer"
+                className="max-h-72 w-auto object-contain transition-transform duration-500 hover:scale-105 drop-shadow-2xl"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3 text-xs">
+              <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                <Star className="h-3.5 w-3.5 fill-amber text-amber shrink-0" />
+                <span><strong className="text-foreground">4.9★</strong> (312+ Google Reviews)</span>
+              </div>
+              <div className="flex items-center justify-end gap-1.5 text-right font-medium text-teal">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                <span>Heated fresh water & silent power</span>
+              </div>
             </div>
           </div>
         </div>
+
         <div id="quote" className="scroll-mt-24 lg:sticky lg:top-24 lg:self-start">
           <QuoteWizard preset={preset} />
         </div>
