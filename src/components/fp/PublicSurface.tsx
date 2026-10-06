@@ -68,6 +68,7 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
   const [postal, setPostal] = useState("M4P 1T7");
   const [addons, setAddons] = useState<string[]>(["salt"]);
   const [sibling, setSibling] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "apple_pay" | "google_pay" | "interac">("apple_pay");
   const [booked, setBooked] = useState(false);
 
   const zone = useMemo(() => {
@@ -201,6 +202,99 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
             {sibling && (
               <div className="mt-3 rounded-xl bg-success-soft p-3 text-sm font-semibold text-success">🐾 Multi-Pet Sibling discount: -$20 CAD automatically applied for 2nd dog!</div>
             )}
+
+            {/* Canadian Payment Methods Selector */}
+            <div className="mt-4 pt-3 border-t border-border">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Accepted Payment Method (Canada)</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("apple_pay")}
+                  className={cn(
+                    "flex flex-col items-center justify-center rounded-xl border p-2 text-xs font-semibold transition cursor-pointer",
+                    paymentMethod === "apple_pay" ? "border-ink bg-ink text-white" : "border-border bg-card text-foreground"
+                  )}
+                >
+                  <span className="text-sm font-bold"> Pay</span>
+                  <span className="text-[10px] opacity-75">1-Tap Fast</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("google_pay")}
+                  className={cn(
+                    "flex flex-col items-center justify-center rounded-xl border p-2 text-xs font-semibold transition cursor-pointer",
+                    paymentMethod === "google_pay" ? "border-teal bg-teal text-white" : "border-border bg-card text-foreground"
+                  )}
+                >
+                  <span className="text-sm font-bold">G Pay</span>
+                  <span className="text-[10px] opacity-75">Instant</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("card")}
+                  className={cn(
+                    "flex flex-col items-center justify-center rounded-xl border p-2 text-xs font-semibold transition cursor-pointer",
+                    paymentMethod === "card" ? "border-gold bg-gold-soft text-ink font-bold" : "border-border bg-card text-foreground"
+                  )}
+                >
+                  <span className="text-sm">💳 Card</span>
+                  <span className="text-[10px] opacity-75">Visa/MC/Amex</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("interac")}
+                  className={cn(
+                    "flex flex-col items-center justify-center rounded-xl border p-2 text-xs font-semibold transition cursor-pointer",
+                    paymentMethod === "interac" ? "border-[#ffd100] bg-[#ffd100] text-black font-bold" : "border-border bg-card text-foreground"
+                  )}
+                >
+                  <span className="text-sm font-black">Interac</span>
+                  <span className="text-[10px] opacity-75">e-Transfer</span>
+                </button>
+              </div>
+
+              {paymentMethod === "card" && (
+                <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3 text-xs">
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground uppercase">Cardholder Details</label>
+                    <input placeholder="Card number •••• •••• •••• ••••" className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none" />
+                  </div>
+                  <div className="flex gap-2">
+                    <input placeholder="MM / YY" className="w-1/2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none" />
+                    <input placeholder="CVC" className="w-1/2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none" />
+                  </div>
+                </div>
+              )}
+
+              {paymentMethod === "interac" && (
+                <div className="mt-3 rounded-xl border border-[#ffd100]/50 bg-[#ffd100]/10 p-3 text-xs text-foreground">
+                  <div className="font-semibold text-black">🇨🇦 Canadian Interac e-Transfer Details:</div>
+                  <p className="mt-1 text-muted-foreground">Send e-Transfer to <strong className="text-foreground">Hello@DogGroomingToronto.ca</strong>. Auto-deposit enabled with instant verification.</p>
+                </div>
+              )}
+
+              <p className="mt-2 text-[10px] text-muted-foreground text-center">
+                🔒 256-bit SSL encrypted • Card held securely with Stripe Canada, not charged until groom completion.
+              </p>
+            </div>
+
+            {booked && (
+              <div className="mt-4 flex flex-col gap-2 rounded-xl bg-success-soft p-3.5 text-xs text-success border border-success/30">
+                <div className="font-bold flex items-center gap-1.5 text-sm">
+                  <Check className="h-4 w-4" /> Slot Held Successfully!
+                </div>
+                <p className="text-foreground">We reserved the route slot for your {breed} in {zone && typeof zone === 'object' ? zone.area : 'Toronto'}. A confirmation message is on its way.</p>
+                <a
+                  href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just requested a mobile grooming slot for my ${breed} (${pkg.name} - $${total} CAD) at postal code ${postal}. Method: ${paymentMethod}.`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-95 transition"
+                >
+                  💬 Open Instant WhatsApp Confirmation (647-451-1747)
+                </a>
+              </div>
+            )}
+
             <p className="mt-3 flex gap-2 text-xs text-muted-foreground"><Info className="h-3.5 w-3.5 shrink-0" /> Transparent policy: cancellations within 24 hours incur a 50% late cancellation fee.</p>
           </div>
         )}
@@ -216,7 +310,7 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
           </button>
         ) : (
           <button onClick={() => setBooked(true)} className="bg-gradient-gold flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-ink shadow-lift transition-transform hover:scale-[1.02]">
-            {booked ? <><Check className="h-4 w-4" /> Slot held — check your SMS</> : <><Clock className="h-4 w-4" /> Book This Slot (&lt; 90 seconds)</>}
+            {booked ? <><Check className="h-4 w-4" /> Slot held — check your SMS</> : <><Clock className="h-4 w-4" /> Authorize & Book Slot (&lt; 90s)</>}
           </button>
         )}
       </div>

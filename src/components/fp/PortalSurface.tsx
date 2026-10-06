@@ -7,6 +7,8 @@ import {
 import barnaby from "@/assets/barnaby.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
+import { dbService } from "@/lib/supabase";
+import { dispatchNotification } from "@/lib/notifications";
 
 interface PetProfile {
   id: string;
@@ -90,6 +92,7 @@ export function PortalSurface() {
   const [bookingDate, setBookingDate] = useState("2026-10-18");
   const [bookingSlot, setBookingSlot] = useState("Morning (8:30 AM – 11:00 AM)");
   const [bookingPackage, setBookingPackage] = useState("Premium Full Groom ($140 – $185 CAD)");
+  const [bookingPayment, setBookingPayment] = useState<"card" | "apple_pay" | "google_pay" | "interac">("apple_pay");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
 
   // VIP Subscription state
@@ -464,8 +467,21 @@ export function PortalSurface() {
                 <div><strong>Dog:</strong> {pet.name} ({pet.breed})</div>
                 <div><strong>Package:</strong> {bookingPackage}</div>
                 <div><strong>Location:</strong> {userAddress}</div>
+                <div><strong>Payment Method:</strong> <span className="uppercase font-bold text-teal">{bookingPayment}</span> (CAD)</div>
                 <div><strong>Latchkey Access:</strong> Authorized (Code {pet.latchkeyCode})</div>
               </div>
+
+              <div className="pt-2">
+                <a
+                  href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just confirmed an appointment for ${pet.name} (${bookingPackage}) on ${bookingDate} (${bookingSlot}) at ${userAddress}. Payment: ${bookingPayment}.`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-90 transition"
+                >
+                  💬 Open WhatsApp Dispatch Receipt (647-451-1747)
+                </a>
+              </div>
+
               <div className="pt-4 flex justify-center gap-3">
                 <button
                   onClick={() => setBookingConfirmed(false)}
@@ -483,9 +499,34 @@ export function PortalSurface() {
             </div>
           ) : (
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 setBookingConfirmed(true);
+                try {
+                  await dbService.saveAppointment({
+                    owner_id: "owner_demo_01",
+                    dog_id: pet.id,
+                    package_id: bookingPackage,
+                    service_date: bookingDate,
+                    time_window: bookingSlot,
+                    postal_code: "M4P 1R4",
+                    address: userAddress,
+                    latchkey_code: pet.latchkeyCode,
+                    total_cad: 149,
+                    payment_method: bookingPayment,
+                    payment_status: "hold_authorized",
+                    status: "confirmed",
+                  });
+                  await dispatchNotification("booking_confirmed", "whatsapp", {
+                    toPhone: userPhone,
+                    clientName: userName,
+                    dogName: pet.name,
+                    appointmentTime: `${bookingDate} (${bookingSlot})`,
+                    address: userAddress,
+                  });
+                } catch {
+                  // graceful fallback
+                }
               }}
               className="space-y-6"
             >
@@ -545,6 +586,57 @@ export function PortalSurface() {
                   onChange={(e) => setUserAddress(e.target.value)}
                   className="mt-1 w-full rounded-xl border border-border bg-background p-2.5 text-sm"
                 />
+              </div>
+
+              {/* Canadian Payment Method Selector */}
+              <div>
+                <label className="text-xs font-bold text-foreground block mb-2">Accepted Payment Method (Canada)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBookingPayment("apple_pay")}
+                    className={cn(
+                      "flex flex-col items-center justify-center rounded-xl border p-2.5 text-xs font-semibold transition cursor-pointer",
+                      bookingPayment === "apple_pay" ? "border-ink bg-ink text-white" : "border-border bg-card text-foreground"
+                    )}
+                  >
+                    <span className="text-sm font-bold"> Pay</span>
+                    <span className="text-[10px] opacity-75">1-Tap Fast</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBookingPayment("google_pay")}
+                    className={cn(
+                      "flex flex-col items-center justify-center rounded-xl border p-2.5 text-xs font-semibold transition cursor-pointer",
+                      bookingPayment === "google_pay" ? "border-teal bg-teal text-white" : "border-border bg-card text-foreground"
+                    )}
+                  >
+                    <span className="text-sm font-bold">G Pay</span>
+                    <span className="text-[10px] opacity-75">Instant</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBookingPayment("card")}
+                    className={cn(
+                      "flex flex-col items-center justify-center rounded-xl border p-2.5 text-xs font-semibold transition cursor-pointer",
+                      bookingPayment === "card" ? "border-gold bg-gold-soft text-ink font-bold" : "border-border bg-card text-foreground"
+                    )}
+                  >
+                    <span className="text-sm">💳 Card</span>
+                    <span className="text-[10px] opacity-75">Visa/MC/Amex</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBookingPayment("interac")}
+                    className={cn(
+                      "flex flex-col items-center justify-center rounded-xl border p-2.5 text-xs font-semibold transition cursor-pointer",
+                      bookingPayment === "interac" ? "border-[#ffd100] bg-[#ffd100] text-black font-bold" : "border-border bg-card text-foreground"
+                    )}
+                  >
+                    <span className="text-sm font-black">Interac</span>
+                    <span className="text-[10px] opacity-75">e-Transfer</span>
+                  </button>
+                </div>
               </div>
 
               <div className="rounded-xl border border-border bg-secondary/40 p-4">

@@ -109,35 +109,202 @@ export function Faq() {
 }
 
 export function SiteFooter() {
+  const [subscribedEmail, setSubscribedEmail] = useState("");
+  const [subscribedDone, setSubscribedDone] = useState(false);
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (subscribedEmail.trim()) {
+      setSubscribedDone(true);
+      setTimeout(() => setSubscribedDone(false), 4000);
+      setSubscribedEmail("");
+    }
+  };
+
   return (
-    <footer className="border-t border-border bg-secondary/40">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 text-sm md:grid-cols-4 md:px-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <BrandLogo className="h-9 w-9" />
-            <div className="font-serif text-xl font-semibold text-teal">The Fresh Pooch</div>
+    <footer className="border-t border-border bg-[#c89222]/10 md:bg-secondary/40">
+      <div className="mx-auto max-w-7xl px-4 py-12 text-sm md:px-6">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Quick Links */}
+          <div>
+            <h4 className="font-serif text-lg font-semibold text-foreground">Quick links</h4>
+            <ul className="mt-4 space-y-2.5 text-muted-foreground text-sm">
+              <li>
+                <a href="#quote" className="hover:text-teal transition-colors">Contact Us / Book Now</a>
+              </li>
+              <li>
+                <a href="#packages" className="hover:text-teal transition-colors">Who We Are</a>
+              </li>
+              <li>
+                <a href="#faq" className="hover:text-teal transition-colors">Cancellation Policy</a>
+              </li>
+              <li>
+                <a href="#faq" className="hover:text-teal transition-colors">Privacy Policy</a>
+              </li>
+              <li>
+                <a href="#subscriptions" className="hover:text-teal transition-colors">VIP Club & Sitemap</a>
+              </li>
+            </ul>
           </div>
-          <p className="mt-2 text-muted-foreground">Toronto's vintage luxury mobile dog spa. Licensed & insured • Organic products only.</p>
-          <a href="https://instagram.com/thefreshpooch" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 font-semibold text-teal"><Instagram className="h-4 w-4" /> @thefreshpooch</a>
+
+          {/* BOOK NOW Contact */}
+          <div>
+            <h4 className="font-serif text-lg font-semibold text-foreground">BOOK NOW</h4>
+            <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
+              <li>
+                <span className="font-semibold text-foreground">Phone: </span>
+                <a href="tel:+16474511747" className="hover:text-teal transition-colors">647-451-1747</a>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">Whatsapp: </span>
+                <a
+                  href="https://wa.me/16474511747"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-teal transition-colors"
+                >
+                  647-451-1747
+                </a>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">SMS: </span>
+                <a href="sms:+16474511747" className="hover:text-teal transition-colors">647-451-1747</a>
+              </li>
+              <li>
+                <span className="font-semibold text-foreground">Instagram: </span>
+                <a
+                  href="https://instagram.com/thefreshpooch"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-teal transition-colors"
+                >
+                  @thefreshpooch
+                </a>
+              </li>
+              <li className="pt-2 text-xs">
+                <span className="inline-block rounded-full bg-teal/10 text-teal px-2.5 py-1 font-semibold">
+                  ✓ Mon – Sun: 8:30 AM – 6:00 PM (Open 7 Days)
+                </span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Newsletter Subscription */}
+          <div className="lg:col-span-2">
+            <h4 className="font-serif text-lg font-semibold text-foreground">Subscribe to The Fresh Pooch:</h4>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Get secret promotional slots, seasonal Toronto paw care tips, and VIP member perks.
+            </p>
+            <form onSubmit={handleSubscribe} className="mt-4 flex flex-col sm:flex-row gap-2 max-w-md">
+              <input
+                type="email"
+                required
+                value={subscribedEmail}
+                onChange={(e) => setSubscribedEmail(e.target.value)}
+                placeholder="Email address"
+                className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-1 focus:ring-teal"
+              />
+              <button
+                type="submit"
+                className="rounded-xl bg-ink px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-ink-foreground transition hover:opacity-90"
+              >
+                {subscribedDone ? "✓ Subscribed!" : "SUBSCRIBE"}
+              </button>
+            </form>
+            {subscribedDone && (
+              <p className="mt-2 text-xs font-semibold text-success">
+                🎉 Welcome to the pack! Check your inbox for a special welcome treat.
+              </p>
+            )}
+            <div className="mt-5 text-xs text-muted-foreground">
+              <strong className="text-foreground">Service Hub:</strong> East York, Etobicoke, North York, York, Midtown, Downtown, Annex, Rosedale, Leaside, plus Mississauga, Markham, Scarborough & Richmond Hill.
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="eyebrow text-gold">Contact</div>
-          <a href="tel:+16474511747" className="flex items-center gap-2 hover:text-teal"><Phone className="h-4 w-4" /> (647) 451-1747</a>
-          <a href="mailto:Hello@DogGroomingToronto.ca" className="flex items-center gap-2 hover:text-teal"><Mail className="h-4 w-4" /> Hello@DogGroomingToronto.ca</a>
+        {/* Bottom Bar: Canadian Payment Badges & Social Media Icons */}
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-border pt-8 sm:flex-row">
+          {/* Payment Badges (Canada Most Recurring Methods) */}
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            {/* Amex */}
+            <span className="flex h-7 items-center rounded border border-border bg-white px-2 text-[10px] font-black tracking-tighter text-[#006fcf] shadow-2xs" title="American Express">
+              AMEX
+            </span>
+            {/* Apple Pay */}
+            <span className="flex h-7 items-center rounded border border-border bg-black px-2.5 text-[10px] font-semibold text-white shadow-2xs" title="Apple Pay">
+               Pay
+            </span>
+            {/* Diners Club */}
+            <span className="flex h-7 items-center rounded border border-border bg-white px-2 text-[10px] font-bold text-[#004a97] shadow-2xs" title="Diners Club">
+              Diners
+            </span>
+            {/* Discover */}
+            <span className="flex h-7 items-center rounded border border-border bg-white px-2 text-[10px] font-bold text-[#ff6600] shadow-2xs" title="Discover">
+              DISCOVER
+            </span>
+            {/* Google Pay */}
+            <span className="flex h-7 items-center rounded border border-border bg-white px-2 text-[10px] font-medium text-[#5f6368] shadow-2xs" title="Google Pay">
+              <strong className="text-[#4285F4]">G</strong> Pay
+            </span>
+            {/* Mastercard */}
+            <span className="flex h-7 items-center gap-0.5 rounded border border-border bg-white px-2 text-[10px] font-bold shadow-2xs" title="Mastercard">
+              <span className="h-3 w-3 rounded-full bg-[#eb001b] inline-block -mr-1" />
+              <span className="h-3 w-3 rounded-full bg-[#f79e1b] inline-block opacity-90" />
+            </span>
+            {/* Visa */}
+            <span className="flex h-7 items-center rounded border border-border bg-white px-2 text-[11px] font-extrabold italic text-[#1a1f71] shadow-2xs" title="Visa">
+              VISA
+            </span>
+            {/* Interac (Canadian Banking Standard) */}
+            <span className="flex h-7 items-center rounded border border-border bg-[#ffd100] px-2 text-[10px] font-black text-black shadow-2xs" title="Interac e-Transfer Canada">
+              Interac
+            </span>
+          </div>
+
+          {/* Social Icons (Facebook & Instagram) */}
+          <div className="flex items-center gap-4">
+            <a
+              href="https://facebook.com/thefreshpooch"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Facebook The Fresh Pooch"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-foreground hover:bg-teal hover:text-white transition shadow-sm"
+            >
+              <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+              </svg>
+            </a>
+            <a
+              href="https://instagram.com/thefreshpooch"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Instagram The Fresh Pooch"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-foreground hover:bg-teal hover:text-white transition shadow-sm"
+            >
+              <Instagram className="h-4 w-4" />
+            </a>
+          </div>
         </div>
-        <div className="space-y-2">
-          <div className="eyebrow text-gold">Hours</div>
-          <p className="flex gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0" /> Monday – Sunday: 8:30 AM – 6:00 PM</p>
-          <p className="text-xs font-semibold text-teal flex items-center gap-1">✓ Open 7 Days a Week (Including Sundays)</p>
-        </div>
-        <div className="space-y-2">
-          <div className="eyebrow text-gold">Service Hub & Coverage</div>
-          <p className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" /> Toronto: East York, Etobicoke, North York, York, Midtown, Downtown, Annex, Rosedale & Leaside.</p>
-          <p className="text-xs text-muted-foreground">Partially: Mississauga, Markham, Scarborough & Richmond Hill.</p>
+
+        {/* Copyright */}
+        <div className="mt-6 border-t border-border/50 pt-4 text-center text-xs text-muted-foreground">
+          © 2026, TorontoDogGrooming Powered by The Fresh Pooch Mobile Spa • All Rights Reserved
         </div>
       </div>
-      <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">© 2026 The Fresh Pooch Mobile Spa</div>
+
+      {/* Floating WhatsApp Quick-Chat Action Button (Toronto: 647-451-1747) */}
+      <a
+        href="https://wa.me/16474511747?text=Hello%20The%20Fresh%20Pooch!%20I'd%20like%20to%20inquire%20about%20mobile%20grooming%20in%20Toronto."
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Chat on WhatsApp"
+        className="fixed bottom-6 left-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lift hover:scale-110 active:scale-95 transition-transform"
+        title="Chat with us on WhatsApp (647-451-1747)"
+      >
+        <svg className="h-7 w-7 fill-current" viewBox="0 0 24 24">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+        </svg>
+      </a>
     </footer>
   );
 }

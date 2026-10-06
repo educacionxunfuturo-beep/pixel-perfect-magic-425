@@ -1,7 +1,11 @@
 import { useState } from "react";
-import { Phone, MessageSquare, KeyRound, Eye, EyeOff, FileSignature, Camera, Rocket, MapPin, Check, ShieldCheck } from "lucide-react";
+import {
+  Phone, MessageSquare, KeyRound, Eye, EyeOff, FileSignature, Camera, Rocket, MapPin, Check, ShieldCheck,
+  Bell, Send, CheckCircle2, DollarSign, X, ExternalLink
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Chip, Pill } from "./primitives";
+import { dispatchNotification, type DispatchResult, generateWhatsAppLink } from "@/lib/notifications";
 
 const STOPS = [
   {
@@ -82,9 +86,34 @@ export function GroomerSurface() {
   const [report, setReport] = useState<Record<string, string>>({ coat: "Silky", ears: "Clean & Fresh", nails: "Clipped & Buffed" });
   const [photos, setPhotos] = useState<{ before?: string; after?: string }>({});
   const [sent, setSent] = useState(false);
+  const [notifyResult, setNotifyResult] = useState<DispatchResult | null>(null);
+  const [sendingAlert, setSendingAlert] = useState(false);
   const stop = STOPS[active]!;
 
   const onPhoto = (k: "before" | "after", f?: File) => f && setPhotos((p) => ({ ...p, [k]: URL.createObjectURL(f) }));
+
+  const handle10MinAlert = async (channel: "sms" | "whatsapp") => {
+    setSendingAlert(true);
+    const res = await dispatchNotification("10_min_alert", channel, {
+      toPhone: stop.phone,
+      clientName: stop.pet + "'s Family",
+      dogName: stop.pet,
+      address: stop.address,
+    });
+    setNotifyResult(res);
+    setSendingAlert(false);
+  };
+
+  const handleSendReport = async (channel: "sms" | "whatsapp" | "email") => {
+    setSent(true);
+    const res = await dispatchNotification("report_card", channel, {
+      toPhone: stop.phone,
+      clientName: stop.pet + "'s Family",
+      dogName: stop.pet,
+      reportCardUrl: "https://educacionxunfuturo-beep-pixel-perfect-magic-425.valetdemo.workers.dev",
+    });
+    setNotifyResult(res);
+  };
 
   return (
     <div className="animate-fade-up mx-auto max-w-7xl px-4 py-8 md:px-6">
@@ -99,7 +128,7 @@ export function GroomerSurface() {
       <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
         <div className="space-y-2">
           {STOPS.map((s, i) => (
-            <button key={s.pet} onClick={() => { setActive(i); setReveal(false); setSent(false); }} className={cn("flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition-all", i === active ? "border-teal bg-card shadow-lift" : "border-transparent bg-card/60 hover:bg-card")}>
+            <button key={s.pet} onClick={() => { setActive(i); setReveal(false); setSent(false); setNotifyResult(null); }} className={cn("flex w-full items-center gap-4 rounded-2xl border-2 p-4 text-left transition-all", i === active ? "border-teal bg-card shadow-lift" : "border-transparent bg-card/60 hover:bg-card")}>
               <div className="rounded-xl bg-ink px-3 py-2 text-center font-mono text-sm font-bold text-ink-foreground">{s.time}</div>
               <div className="flex-1">
                 <div className="text-lg font-bold">{s.pet}</div>
@@ -118,11 +147,60 @@ export function GroomerSurface() {
                 <h2 className="text-3xl font-semibold">{stop.pet} <span className="text-xl text-muted-foreground">the {stop.breed}</span></h2>
                 <p className="mt-1 flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-4 w-4" /> {stop.address}</p>
               </div>
-              <div className="flex gap-2">
-                <a href={`tel:${stop.phone}`} className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success text-primary-foreground hover:opacity-90"><Phone className="h-6 w-6" /></a>
-                <a href={`sms:${stop.phone}`} className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal text-primary-foreground hover:opacity-90"><MessageSquare className="h-6 w-6" /></a>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 10-Min Arrival Alert Dispatchers */}
+                <button
+                  type="button"
+                  onClick={() => handle10MinAlert("sms")}
+                  disabled={sendingAlert}
+                  className="flex items-center gap-1.5 rounded-xl border border-teal bg-teal-soft/40 px-3 py-2 text-xs font-bold text-teal hover:bg-teal hover:text-white transition"
+                  title="Send Twilio SMS: 10 minutes away"
+                >
+                  <Bell className="h-3.5 w-3.5" /> SMS ETA (10 min)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handle10MinAlert("whatsapp")}
+                  className="flex items-center gap-1.5 rounded-xl bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:opacity-90 transition"
+                  title="Send WhatsApp ETA (100% Free)"
+                >
+                  💬 WhatsApp ETA
+                </button>
+                <a href={`tel:${stop.phone}`} className="flex h-10 w-10 items-center justify-center rounded-xl bg-success text-primary-foreground hover:opacity-90 transition"><Phone className="h-4 w-4" /></a>
+                <a href={`sms:${stop.phone}`} className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal text-primary-foreground hover:opacity-90 transition"><MessageSquare className="h-4 w-4" /></a>
               </div>
             </div>
+
+            {/* Notification Live Modal / Banner */}
+            {notifyResult && (
+              <div className="mt-4 rounded-xl border border-teal/40 bg-sage-soft/70 p-4 text-xs">
+                <div className="flex items-center justify-between font-bold text-teal">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    Notification Dispatched via {notifyResult.channel.toUpperCase()} at {notifyResult.timestamp}
+                  </span>
+                  <button onClick={() => setNotifyResult(null)} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="mt-2 text-foreground font-mono bg-card/80 p-2.5 rounded-lg border border-border">
+                  "{notifyResult.message}"
+                </p>
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                  <span>💰 {notifyResult.costEstimateCad}</span>
+                  {notifyResult.whatsappUrl && (
+                    <a
+                      href={notifyResult.whatsappUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-bold text-teal underline"
+                    >
+                      Open Chat in WhatsApp <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="mt-6 grid gap-4 md:grid-cols-[1.3fr_1fr]">
               <div className="rounded-2xl bg-ink p-5 text-ink-foreground">
@@ -170,8 +248,33 @@ export function GroomerSurface() {
               ))}
             </div>
             <textarea placeholder="Quick notes for the owner…" rows={3} className="mt-4 w-full rounded-xl border border-input bg-background p-3 text-sm outline-none focus:border-ring" />
-            <button onClick={() => setSent(true)} className={cn("mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-lg font-bold transition-all", sent ? "bg-success text-primary-foreground" : "bg-gradient-gold text-ink shadow-lift hover:scale-[1.01]")}>
-              {sent ? <><Check className="h-5 w-5" /> Report sent • Review request queued</> : <><Rocket className="h-5 w-5" /> Send Report Card & Request Google Review</>}
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSendReport("whatsapp")}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] py-3 text-xs font-bold text-white hover:opacity-90 transition shadow-sm"
+              >
+                💬 WhatsApp Report (Free)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSendReport("sms")}
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-teal py-3 text-xs font-bold text-white hover:opacity-90 transition shadow-sm"
+              >
+                📱 Twilio SMS ($0.01 CAD)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSendReport("email")}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card py-3 text-xs font-bold text-foreground hover:bg-muted transition shadow-sm"
+              >
+                ✉️ Email Report (Free)
+              </button>
+            </div>
+
+            <button onClick={() => handleSendReport("sms")} className={cn("mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-base font-bold transition-all", sent ? "bg-success text-primary-foreground" : "bg-gradient-gold text-ink shadow-lift hover:scale-[1.01]")}>
+              {sent ? <><Check className="h-5 w-5" /> Report Dispatched • Google Review Queued</> : <><Rocket className="h-5 w-5" /> Complete Stop & Send Report Card</>}
             </button>
           </div>
         </div>
