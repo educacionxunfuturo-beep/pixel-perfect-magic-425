@@ -8,6 +8,7 @@ import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { Packages, PressBanner, Reviews, Faq, PACKAGES, type PackageId } from "./PublicSections";
+import { SubscriptionSection } from "./SubscriptionSection";
 import { SpaReels } from "./SpaReels";
 import { ClientGallery } from "./ClientGallery";
 
@@ -226,10 +227,10 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
 function BeforeAfter() {
   const [pos, setPos] = useState(50);
   return (
-    <div className="card-surface relative aspect-[4/3] select-none overflow-hidden">
-      <img src={afterImg} alt="Doodle after grooming" loading="lazy" width={1024} height={768} className="absolute inset-0 h-full w-full object-cover" />
+    <div className="card-surface relative aspect-square sm:aspect-[4/3] select-none overflow-hidden">
+      <img src={afterImg} alt="Dog after grooming" loading="lazy" width={900} height={900} className="absolute inset-0 h-full w-full object-cover object-center" />
       <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100 - pos}% 0 0)` }}>
-        <img src={beforeImg} alt="Doodle before grooming" loading="lazy" width={1024} height={768} className="absolute inset-0 h-full w-[200%] max-w-none object-cover object-left" />
+        <img src={beforeImg} alt="Dog before grooming" loading="lazy" width={900} height={900} className="absolute inset-0 h-full w-full object-cover object-center" />
       </div>
       <div className="pointer-events-none absolute inset-y-0 w-0.5 bg-card" style={{ left: `${pos}%` }}>
         <div className="absolute top-1/2 left-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-card shadow-lift">
@@ -295,6 +296,7 @@ export function PublicSurface() {
       </section>
 
       <Packages onSelect={select} />
+      <SubscriptionSection />
       <PressBanner />
       <SpaReels />
       <section className="border-t border-border bg-secondary/50">

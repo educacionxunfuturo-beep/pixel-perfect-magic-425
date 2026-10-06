@@ -4,11 +4,66 @@ import { cn } from "@/lib/utils";
 import { Chip, Pill } from "./primitives";
 
 const STOPS = [
-  { time: "8:30", pet: "Luna", breed: "Maltese", svc: "Full Spa", status: "Completed" },
-  { time: "10:00", pet: "Bentley", breed: "Goldendoodle", svc: "Teddy Cut", status: "Completed" },
-  { time: "11:45", pet: "Oscar", breed: "French Bulldog", svc: "Bath & Tidy", status: "En Route" },
-  { time: "1:30", pet: "Maple", breed: "Golden Retriever", svc: "De-Shed", status: "Next" },
-  { time: "3:15", pet: "Pip", breed: "Maltese", svc: "Full Spa", status: "Pending" },
+  {
+    time: "8:30 AM",
+    pet: "Luna",
+    breed: "Maltese",
+    svc: "Full Spa",
+    status: "Completed",
+    code: "9142",
+    address: "88 Broadway Ave, Unit 1402, Toronto M4P 1V6",
+    phone: "416-555-0142",
+    notes: "Concierge notified at front desk. Lockbox on bicycle rack in P1 parking (code 9142). Please ensure harness is snug.",
+    waiver: "Signed digitally (Fear-Free Handling)",
+  },
+  {
+    time: "10:00 AM",
+    pet: "Bentley",
+    breed: "Goldendoodle",
+    svc: "Teddy Cut",
+    status: "Completed",
+    code: "4821",
+    address: "142 Roehampton Ave, Toronto M4P 1R4",
+    phone: "416-555-0199",
+    notes: "Enter through side wooden gate (keypad 4821). Bentley will be in sunroom. Please make sure indoor cat Jasper does not slip out.",
+    waiver: "Signed digitally (Matted Shavedown Waiver)",
+  },
+  {
+    time: "11:45 AM",
+    pet: "Oscar",
+    breed: "French Bulldog",
+    svc: "Bath & Tidy",
+    status: "En Route",
+    code: "3390",
+    address: "180 University Ave (Shangri-La Residences), Toronto M5H 0A2",
+    phone: "416-555-0211",
+    notes: "Visitor loop parking authorized with security. Digital smart lock code is 3390#. Oscar loves head rubs before stepping into van.",
+    waiver: "Signed digitally (Brachycephalic Care)",
+  },
+  {
+    time: "1:30 PM",
+    pet: "Maple",
+    breed: "Golden Retriever",
+    svc: "De-Shed Spa",
+    status: "Next",
+    code: "7105",
+    address: "45 Roxborough St E, Rosedale M4W 1V5",
+    phone: "416-555-0374",
+    notes: "Garage keypad code 7105. Leash hanging on hook next to mudroom door. Blueberry facial authorized.",
+    waiver: "Signed digitally (Full Spa Waiver)",
+  },
+  {
+    time: "3:15 PM",
+    pet: "Pip",
+    breed: "Shih Tzu",
+    svc: "Full Spa",
+    status: "Pending",
+    code: "1628",
+    address: "320 Brunswick Ave, The Annex M5S 2M7",
+    phone: "416-555-0455",
+    notes: "Lockbox code 1628 on rear deck railing. Treats in kitchen bowl if Pip is shy when meeting groomer.",
+    waiver: "Signed digitally (Senior Dog Care)",
+  },
 ] as const;
 
 const statusTone = { Completed: "success", "En Route": "gold", Next: "teal", Pending: "muted" } as const;
@@ -61,11 +116,11 @@ export function GroomerSurface() {
               <div>
                 <div className="eyebrow text-muted-foreground">Active Stop • {stop.time}</div>
                 <h2 className="text-3xl font-semibold">{stop.pet} <span className="text-xl text-muted-foreground">the {stop.breed}</span></h2>
-                <p className="mt-1 flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-4 w-4" /> 142 Roehampton Ave, Toronto M4P 1R4</p>
+                <p className="mt-1 flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-4 w-4" /> {stop.address}</p>
               </div>
               <div className="flex gap-2">
-                <a href="tel:+14165550142" className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success text-primary-foreground"><Phone className="h-6 w-6" /></a>
-                <a href="sms:+14165550142" className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal text-primary-foreground"><MessageSquare className="h-6 w-6" /></a>
+                <a href={`tel:${stop.phone}`} className="flex h-14 w-14 items-center justify-center rounded-2xl bg-success text-primary-foreground hover:opacity-90"><Phone className="h-6 w-6" /></a>
+                <a href={`sms:${stop.phone}`} className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal text-primary-foreground hover:opacity-90"><MessageSquare className="h-6 w-6" /></a>
               </div>
             </div>
 
@@ -76,17 +131,17 @@ export function GroomerSurface() {
                   <KeyRound className="h-5 w-5 text-gold" />
                 </div>
                 <div className="mt-4 flex items-center gap-4">
-                  <div className="font-mono text-4xl font-bold tracking-[0.4em] text-gold">{reveal ? "4821" : "••••"}</div>
-                  <button onClick={() => setReveal(!reveal)} className="flex items-center gap-2 rounded-full bg-card/10 px-4 py-2 text-sm font-semibold">
+                  <div className="font-mono text-4xl font-bold tracking-[0.4em] text-gold">{reveal ? stop.code : "••••"}</div>
+                  <button onClick={() => setReveal(!reveal)} className="flex items-center gap-2 rounded-full bg-card/10 px-4 py-2 text-sm font-semibold hover:bg-card/20 transition-colors">
                     {reveal ? <><EyeOff className="h-4 w-4" /> Hide</> : <><Eye className="h-4 w-4" /> Reveal code</>}
                   </button>
                 </div>
-                <p className="mt-4 text-sm opacity-80">Enter through side wooden gate. Please ensure indoor cat does not escape.</p>
+                <p className="mt-4 text-sm opacity-80">{stop.notes}</p>
               </div>
               <div className="flex flex-col justify-center rounded-2xl border border-border bg-success-soft p-5">
                 <FileSignature className="h-7 w-7 text-success" />
-                <div className="mt-2 font-bold">Matted Shavedown Waiver</div>
-                <Pill tone="success" className="mt-2 self-start"><Check className="h-3.5 w-3.5" /> Signed digitally by owner</Pill>
+                <div className="mt-2 font-bold">{stop.waiver}</div>
+                <Pill tone="success" className="mt-2 self-start"><Check className="h-3.5 w-3.5" /> Verified by owner</Pill>
               </div>
             </div>
           </div>

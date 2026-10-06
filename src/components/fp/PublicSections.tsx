@@ -128,12 +128,13 @@ export function SiteFooter() {
         </div>
         <div className="space-y-2">
           <div className="eyebrow text-gold">Hours</div>
-          <p className="flex gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0" /> Monday – Saturday: 8:30 AM – 6:00 PM</p>
-          <p className="text-muted-foreground">Closed Sundays</p>
+          <p className="flex gap-2"><Clock className="mt-0.5 h-4 w-4 shrink-0" /> Monday – Sunday: 8:30 AM – 6:00 PM</p>
+          <p className="text-xs font-semibold text-teal flex items-center gap-1">✓ Open 7 Days a Week (Including Sundays)</p>
         </div>
         <div className="space-y-2">
-          <div className="eyebrow text-gold">Service Hub</div>
-          <p className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" /> Toronto Midtown (M4P, M4S, M4N), Annex, Rosedale, Leaside, The Beaches & GTA.</p>
+          <div className="eyebrow text-gold">Service Hub & Coverage</div>
+          <p className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0" /> Toronto: East York, Etobicoke, North York, York, Midtown, Downtown, Annex, Rosedale & Leaside.</p>
+          <p className="text-xs text-muted-foreground">Partially: Mississauga, Markham, Scarborough & Richmond Hill.</p>
         </div>
       </div>
       <div className="border-t border-border py-4 text-center text-xs text-muted-foreground">© 2026 The Fresh Pooch Mobile Spa</div>

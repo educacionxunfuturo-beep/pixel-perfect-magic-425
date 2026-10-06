@@ -1,15 +1,16 @@
 import { useState } from "react";
 import {
   TrendingUp, CalendarDays, DollarSign, Users, Truck, Star, ArrowUpRight, ArrowDownRight, MapPin, Fuel, Wrench,
+  Lock, LogOut, ShieldCheck, Key, AlertCircle, Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
 import { AdminTools } from "./AdminTools";
 
 const KPIS = [
-  { label: "Revenue (Nov)", value: "$18,420", delta: "+12.4%", up: true, icon: DollarSign },
-  { label: "Grooms Completed", value: "118", delta: "+9.2%", up: true, icon: CalendarDays },
-  { label: "Active VIP Members", value: "46", delta: "+6 this month", up: true, icon: Users },
+  { label: "Revenue (Nov)", value: "$21,280", delta: "+15.8%", up: true, icon: DollarSign },
+  { label: "Grooms Completed", value: "138", delta: "+12.2%", up: true, icon: CalendarDays },
+  { label: "Active VIP Members", value: "54", delta: "+8 this month", up: true, icon: Users },
   { label: "Avg. Google Rating", value: "4.9", delta: "312 reviews", up: true, icon: Star },
 ];
 
@@ -20,7 +21,7 @@ const WEEK = [
   { day: "Thu", grooms: 3, rev: 470 },
   { day: "Fri", grooms: 6, rev: 940 },
   { day: "Sat", grooms: 6, rev: 990 },
-  { day: "Sun", grooms: 0, rev: 0 },
+  { day: "Sun", grooms: 5, rev: 860 },
 ];
 
 const ZONES = [
@@ -40,10 +41,132 @@ const VAN = [
 
 export function AdminSurface() {
   const [range, setRange] = useState<"week" | "month">("week");
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (
+      (email.trim().toLowerCase() === "admin@thefreshpooch.ca" || email.trim().toLowerCase() === "hello@doggroomingtoronto.ca") &&
+      password.trim() === "pooch2026"
+    ) {
+      setIsAuthenticated(true);
+      setError("");
+    } else {
+      setError("Invalid credentials. Enter admin@thefreshpooch.ca / pooch2026 or use Instant Demo Access.");
+    }
+  };
+
+  const handleDemoLogin = () => {
+    setEmail("admin@thefreshpooch.ca");
+    setPassword("pooch2026");
+    setIsAuthenticated(true);
+    setError("");
+  };
+
   const maxRev = Math.max(...WEEK.map((d) => d.rev));
+
+  if (!isAuthenticated) {
+    return (
+      <div className="animate-fade-up mx-auto max-w-md px-4 py-16 sm:py-24">
+        <div className="card-surface overflow-hidden border border-border shadow-lift">
+          <div className="bg-gradient-teal p-6 text-center text-primary-foreground trailer-rivets">
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-card/20 backdrop-blur border border-card/30">
+              <Lock className="h-7 w-7 text-gold" />
+            </div>
+            <h2 className="font-serif text-2xl font-bold">The Fresh Pooch Operations</h2>
+            <p className="mt-1 text-xs text-primary-foreground/80">
+              Restricted Staff & Fleet Management Portal
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4 p-6 sm:p-8">
+            <div className="rounded-xl border border-gold/40 bg-gold-soft/30 p-3 text-xs text-muted-foreground flex items-start gap-2.5">
+              <Key className="h-4 w-4 shrink-0 text-gold mt-0.5" />
+              <div>
+                <strong className="text-foreground">Separate Admin Credentials:</strong>
+                <p className="mt-0.5">Customer pet accounts cannot log in here. Dispatchers and fleet supervisors only.</p>
+              </div>
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs font-medium text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Admin Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@thefreshpooch.ca"
+                className="mt-1.5 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-1 focus:ring-teal"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Master Security Key / Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="mt-1.5 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-1 focus:ring-teal"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-ink py-3 text-sm font-bold text-ink-foreground shadow-lift transition hover:opacity-95"
+            >
+              Sign In to Ops Console
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              className="w-full rounded-xl border border-gold bg-gold-soft/40 py-2.5 text-xs font-bold text-ink transition hover:bg-gold/20 flex items-center justify-center gap-1.5"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-gold" />
+              ⚡ One-Click Demo Admin Access
+            </button>
+
+            <div className="text-center text-[11px] text-muted-foreground">
+              Demo credentials: <code className="font-mono text-foreground font-semibold">admin@thefreshpooch.ca</code> / <code className="font-mono text-foreground font-semibold">pooch2026</code>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-up mx-auto max-w-7xl px-4 py-8 md:px-6">
+      {/* Admin Session Banner */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-teal/20 bg-sage-soft/60 px-5 py-3">
+        <div className="flex items-center gap-2.5 text-xs">
+          <ShieldCheck className="h-4 w-4 text-teal" />
+          <span className="font-semibold text-foreground">Secure Admin Session:</span>
+          <span className="text-muted-foreground">Logged in as Operations Director (<code className="font-mono">admin@thefreshpooch.ca</code>)</span>
+          <Pill tone="success" className="ml-1 text-[10px]">Open 7 Days Active</Pill>
+        </div>
+        <button
+          onClick={() => setIsAuthenticated(false)}
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition"
+        >
+          <LogOut className="h-3.5 w-3.5" /> Lock / Sign Out
+        </button>
+      </div>
+
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="eyebrow text-gold">Owner Dashboard</div>
