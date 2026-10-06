@@ -4,6 +4,8 @@ import { TopNav, type Surface } from "@/components/fp/TopNav";
 import { PublicSurface } from "@/components/fp/PublicSurface";
 import { PortalSurface } from "@/components/fp/PortalSurface";
 import { GroomerSurface } from "@/components/fp/GroomerSurface";
+import { SiteFooter } from "@/components/fp/PublicSections";
+import { QimmiqAssistant } from "@/components/fp/QimmiqAssistant";
 import { AdminSurface } from "@/components/fp/AdminSurface";
 
 export const Route = createFileRoute("/")({
@@ -40,13 +42,8 @@ function Index() {
         {surface === "groomer" && <GroomerSurface />}
         {surface === "admin" && <AdminSurface />}
       </main>
-      <footer className="border-t border-border bg-secondary/40">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground md:px-6">
-          <span className="font-serif text-lg font-semibold text-teal">The Fresh Pooch</span>
-          <span>Licensed & insured • Toronto & GTA • Organic products only</span>
-          <span>© 2026 The Fresh Pooch Mobile Spa</span>
-        </div>
-      </footer>
+      <SiteFooter />
+      <QimmiqAssistant />
     </div>
   );
 }
