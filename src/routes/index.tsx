@@ -34,16 +34,35 @@ function Index() {
   const [surface, setSurface] = useState<Surface>("public");
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
+  const handleNavChange = (s: Surface) => {
+    if (s === "portal" && isAdminAuthenticated) {
+      setSurface("admin");
+    } else {
+      setSurface(s);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <TopNav surface={surface} onChange={setSurface} />
+      <TopNav surface={surface} onChange={handleNavChange} />
       <main>
-        {surface === "public" && <PublicSurface onOpenPortal={() => setSurface("portal")} />}
-        {surface === "portal" && <PortalSurface onAdminLogin={() => setSurface("admin")} />}
+        {surface === "public" && <PublicSurface onOpenPortal={() => handleNavChange("portal")} />}
+        {surface === "portal" && (
+          <PortalSurface
+            onAdminLogin={() => {
+              setIsAdminAuthenticated(true);
+              setSurface("admin");
+            }}
+          />
+        )}
         {surface === "groomer" && <GroomerSurface />}
         {surface === "admin" && (
           <AdminSurface
-            onClientLogin={() => setSurface("portal")}
+            initialAuthenticated={true}
+            onClientLogin={() => {
+              setIsAdminAuthenticated(false);
+              setSurface("portal");
+            }}
             onAuthChange={setIsAdminAuthenticated}
           />
         )}

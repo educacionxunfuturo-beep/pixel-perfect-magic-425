@@ -3,7 +3,7 @@ import {
   CalendarHeart, Crown, Upload, Truck, Check, Navigation, Bath, Sparkles, MapPin,
   ShieldCheck, AlertTriangle, KeyRound, Eye, EyeOff, Clock, User, Phone, Mail,
   Calendar, FileText, Plus, ChevronRight, LogOut, CheckCircle2, Heart, Award,
-  Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle, Camera
+  Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle, Camera, PawPrint
 } from "lucide-react";
 import barnaby from "@/assets/barnaby.jpg";
 import { cn } from "@/lib/utils";
@@ -199,9 +199,10 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
 
                 <button
                   type="submit"
-                  className="mt-4 w-full rounded-full bg-teal py-3 text-sm font-bold text-white shadow-lift transition-transform hover:scale-[1.02]"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-teal py-3 text-sm font-bold text-white shadow-lift transition-transform hover:scale-[1.02]"
                 >
-                  {authMode === "login" ? "Sign In" : "Create Account & Enter Portal"}
+                  <PawPrint className="h-4 w-4" />
+                  <span>{authMode === "login" ? "Sign In to Pet Parent Portal" : "Create Account & Enter Portal"}</span>
                 </button>
               </form>
 
@@ -216,29 +217,20 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     : "Already have an account? Sign in here"}
                 </button>
               </div>
-            </div>
 
-            <div className="mt-6 rounded-2xl bg-secondary/70 p-4 border border-border text-center space-y-2">
-              <span className="font-bold text-xs text-ink block">🐾 Instant One-Click Access</span>
-              <p className="text-[11px] text-muted-foreground">
-                Both pet parents and staff sign in here. Select your profile to enter immediately:
-              </p>
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsAuthenticated(true)}
-                  className="rounded-xl bg-teal px-3 py-2 text-xs font-bold text-white hover:bg-teal/90 transition shadow-sm"
-                >
-                  🐾 Client (Barnaby)
-                </button>
+              {/* Discreet staff key access at the bottom */}
+              <div className="mt-6 border-t border-border/80 pt-4 flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => {
+                    setUserEmail("admin@thefreshpooch.ca");
                     if (onAdminLogin) onAdminLogin();
                   }}
-                  className="rounded-xl bg-ink px-3 py-2 text-xs font-bold text-white hover:bg-ink/90 transition shadow-sm"
+                  className="group inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:border-gold/50 hover:bg-gold-soft/20 hover:text-foreground"
+                  title="Staff & Operations Management Console"
                 >
-                  🔑 Staff Admin Demo
+                  <KeyRound className="h-3.5 w-3.5 text-gold transition-transform group-hover:scale-110" />
+                  <span>Staff & Fleet Operations Access</span>
                 </button>
               </div>
             </div>

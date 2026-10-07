@@ -1,4 +1,4 @@
-import { Globe, PawPrint, Truck, BarChart3, KeyRound } from "lucide-react";
+import { Globe, PawPrint, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./primitives";
 
@@ -8,7 +8,6 @@ const tabs: { id: Surface; label: string; short: string; icon: typeof Globe }[] 
   { id: "public", label: "Public Web & Quote", short: "Web", icon: Globe },
   { id: "portal", label: "Customer Portal", short: "Portal", icon: PawPrint },
   { id: "groomer", label: "Groomer Field Mode", short: "Van", icon: Truck },
-  { id: "admin", label: "Staff Admin", short: "Admin", icon: KeyRound },
 ];
 
 export function TopNav({ surface, onChange }: { surface: Surface; onChange: (s: Surface) => void }) {
@@ -26,13 +25,13 @@ export function TopNav({ surface, onChange }: { surface: Surface; onChange: (s: 
         <nav className="order-3 flex w-full gap-1 overflow-x-auto rounded-full border border-border bg-card p-1 shadow-sm lg:order-none lg:mx-auto lg:w-auto">
           {tabs.map((t) => {
             const Icon = t.icon;
-            const active = surface === t.id;
+            const active = surface === t.id || (surface === "admin" && t.id === "portal");
             return (
               <button
                 key={t.id}
                 onClick={() => onChange(t.id)}
                 className={cn(
-                  "flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold transition-all lg:flex-none lg:px-4",
+                  "flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-semibold transition-all lg:flex-none lg:px-5",
                   active ? "bg-ink text-ink-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                 )}
               >

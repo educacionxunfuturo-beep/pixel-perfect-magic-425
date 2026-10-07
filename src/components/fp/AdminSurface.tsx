@@ -42,12 +42,14 @@ const VAN = [
 export function AdminSurface({
   onClientLogin,
   onAuthChange,
+  initialAuthenticated = true,
 }: {
   onClientLogin?: () => void;
   onAuthChange?: (isAuth: boolean) => void;
+  initialAuthenticated?: boolean;
 }) {
   const [range, setRange] = useState<"week" | "month">("week");
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(initialAuthenticated);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -190,6 +192,7 @@ export function AdminSurface({
           onClick={() => {
             setIsAuthenticated(false);
             onAuthChange?.(false);
+            if (onClientLogin) onClientLogin();
           }}
           className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition"
         >
