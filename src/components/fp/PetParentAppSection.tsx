@@ -5,9 +5,11 @@ import {
 } from "lucide-react";
 import { Pill, SectionTitle } from "./primitives";
 import barnabyImg from "@/assets/barnaby.jpg";
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 
 export function PetParentAppSection({ onOpenPortal }: { onOpenPortal?: () => void }) {
   const [showQr, setShowQr] = useState(false);
+  const { count } = useLiveGroomCounter(648);
 
   const perks = [
     {
@@ -58,7 +60,7 @@ export function PetParentAppSection({ onOpenPortal }: { onOpenPortal?: () => voi
               <Smartphone className="h-3.5 w-3.5 text-gold" /> The Fresh Pooch Mobile App & Portal
             </Pill>
             <h2 className="font-serif text-3xl font-semibold leading-tight text-ink sm:text-4xl md:text-5xl">
-              Why 600+ Toronto Dog Parents <em className="text-teal font-normal">Keep Our App on Their Phone</em>
+              Why <strong className="tabular-nums font-bold">{count}+</strong> Toronto Dog Parents <em className="text-teal font-normal">Keep Our App on Their Phone</em>
             </h2>
             <p className="mt-4 text-base text-muted-foreground md:text-lg leading-relaxed">
               Never worry about forgetting vaccine renewals, rushing home from work, or explaining your dog's haircut twice. Your personal <strong>Fresh Pooch Passport</strong> puts stress-free mobile grooming on autopilot.

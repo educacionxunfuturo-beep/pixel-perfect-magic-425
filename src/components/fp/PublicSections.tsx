@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Star, ChevronDown, Newspaper, ShieldCheck, Leaf, Award, Phone, Mail, Clock, MapPin, Instagram } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle, BrandLogo } from "./primitives";
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 
 export type PackageId = "tidy" | "full" | "ultimate";
 export const PACKAGES: { id: PackageId; name: string; price: string; from: number; best: string; includes: string[]; popular?: boolean }[] = [
@@ -60,9 +61,10 @@ const REVIEWS = [
 ];
 
 export function Reviews() {
+  const { count } = useLiveGroomCounter(648);
   return (
     <div>
-      <SectionTitle eyebrow="Toronto Client Love" title="5.0 Star Experience" sub="Over 600+ happy dogs pampered right at their doorstep across Toronto." />
+      <SectionTitle eyebrow="Toronto Client Love" title="5.0 Star Experience" sub={`Over ${count}+ happy dogs pampered right at their doorstep across Toronto.`} />
       <div className="space-y-4">
         {REVIEWS.map((r) => (
           <div key={r.name} className="card-surface p-5">

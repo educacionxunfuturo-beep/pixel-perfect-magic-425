@@ -7,94 +7,342 @@ import qimmiqAvatar from "@/assets/qimmiq-avatar.jpg";
 type Mode = "client" | "admin";
 type Msg = { from: "user" | "ai"; text: string };
 
-const PROMPTS = [
+const CLIENT_PROMPTS = [
   "Are you open on Sundays?",
   "What's the price for a 30lb Goldendoodle?",
   "How do VIP Club subscriptions work?",
   "Which Toronto areas do you service?",
-  "How does Latchkey contactless service work?",
-  "What vaccines are required?",
+  "How does Latchkey contactless work?",
+  "What vaccines are required in Ontario?",
+  "Do you accept Interac & Apple Pay?",
+];
+
+const ADMIN_PROMPTS = [
+  "📊 Ingresos de hoy y balance del mes",
+  "🚐 Estado de agua y combustible Van #1",
+  "🔑 Códigos Latchkey activos de hoy",
+  "📍 Densidad de rutas por zonas en Toronto",
+  "👑 Tasa de retención de miembros VIP",
+  "❄️ Simulación de reprogramación por clima",
+  "🩺 Auditoría de vacunas de mascotas",
 ];
 
 function reply(q: string, mode: Mode): string {
   const s = q.toLowerCase();
 
+  // ========================================================
+  // ADMIN COPILOT REPLIES
+  // ========================================================
+  if (mode === "admin") {
+    // Revenue & financial metrics
+    if (
+      s.includes("revenue") ||
+      s.includes("ingreso") ||
+      s.includes("dinero") ||
+      s.includes("factura") ||
+      s.includes("kpi") ||
+      s.includes("balance") ||
+      s.includes("ganancia") ||
+      s.includes("ventas")
+    ) {
+      return "📊 **Resumen Financiero y Operaciones de Hoy:**\n\n• **Citas de hoy:** 5 servicios de spa completados en Midtown y The Annex.\n• **Ingresos recaudados hoy:** $860.00 CAD.\n• **Facturación del mes (Nov):** $21,280.00 CAD (+15.8% sobre objetivo).\n• **Ticket promedio:** $154.20 CAD por perro.\n• **Propinas hoy:** $142.00 CAD (16.5% promedio).\n• **Ocupación de van #1:** 94% de slots reservados.\n\n*Hito operacional:* 54 perritos con suscripción VIP activa generan $7,830.00 CAD de MRR garantizado.";
+    }
+
+    // Van telemetry, tanks & fuel
+    if (
+      s.includes("water") ||
+      s.includes("agua") ||
+      s.includes("van") ||
+      s.includes("tank") ||
+      s.includes("tanque") ||
+      s.includes("fuel") ||
+      s.includes("gasolina") ||
+      s.includes("combustible") ||
+      s.includes("trailer") ||
+      s.includes("bater") ||
+      s.includes("generador") ||
+      s.includes("mantenimiento")
+    ) {
+      return "🚐 **Telemetría en Vivo — Van #1 (Luxury Mobile Spa):**\n\n• **Tanque de Agua Dulce:** 72% (~95 Litros disponibles, suficiente para 4 servicios adicionales sin recargar).\n• **Tanque de Aguas Grises:** 31% de capacidad (vaciado seguro programado al fin de turno).\n• **Combustible / Generador silencioso:** 78% (próximo repostaje el viernes).\n• **Baterías Eco-Litio & Solar:** 88% de carga.\n• **Próximo Mantenimiento Preventivo:** 12 de Diciembre (inspección de bomba y fluidos).\n• **Ubicación GPS actual:** Corredor Roehampton Ave, Midtown (M4P 1R4).";
+    }
+
+    // Latchkey access codes & security
+    if (
+      s.includes("latchkey") ||
+      s.includes("codigo") ||
+      s.includes("código") ||
+      s.includes("llave") ||
+      s.includes("lockbox") ||
+      s.includes("clave") ||
+      s.includes("puerta") ||
+      s.includes("acceso") ||
+      s.includes("stop") ||
+      s.includes("parada")
+    ) {
+      return "🔑 **Códigos Latchkey Activos de Hoy (Toronto):**\n\n• **Midtown (10:00 AM):** Barnaby (Goldendoodle) — Código: `4821` (Portón lateral de madera; gato Jasper en terraza).\n• **The Annex (12:30 PM):** Winston (Poodle) — Código: `9042` (Smart Lock Schlage).\n• **Rosedale (3:00 PM):** Coco (Pomeranian) — Código: `1537` (Lockbox con combinación en porche).\n\n*Protocolo de Seguridad:* Todos los códigos se encriptan bajo AES-256 geolocalizado. Solo se revelan en la app del peluquero certificado cuando el GPS detecta la van a menos de 50 metros del domicilio.";
+    }
+
+    // Route density & zones
+    if (
+      s.includes("route") ||
+      s.includes("ruta") ||
+      s.includes("densidad") ||
+      s.includes("density") ||
+      s.includes("zona") ||
+      s.includes("zone") ||
+      s.includes("barrio") ||
+      s.includes("midtown") ||
+      s.includes("annex") ||
+      s.includes("beaches") ||
+      s.includes("rosedale")
+    ) {
+      return "📍 **Densidad de Rutas y Saturación por Zonas de Toronto:**\n\n• **Midtown (Miércoles):** 92% ocupación (34 reservas / 36 slots) — Zona de mayor densidad y rentabilidad.\n• **The Annex (Martes):** 84% ocupación (27 reservas).\n• **The Beaches (Sábados):** 88% ocupación (31 reservas).\n• **Rosedale (Jueves):** 68% ocupación (19 reservas).\n• **King West (Lunes):** 54% ocupación (15 reservas).\n\n*Optimización de ruta:* Tiempos muertos de traslado reducidos a una media de 11.4 minutos entre paradas.";
+    }
+
+    // VIP retention & members
+    if (
+      s.includes("vip") ||
+      s.includes("retenci") ||
+      s.includes("retention") ||
+      s.includes("miembro") ||
+      s.includes("suscrip") ||
+      s.includes("mrr")
+    ) {
+      return "👑 **Salud de Suscripciones VIP Pooch Club:**\n\n• **Miembros Activos:** 54 perritos en rutinas recurrentes de 4, 6 y 8 semanas (+8 altas este mes).\n• **Tasa de Retención a 90 días:** 96.2%.\n• **MRR (Ingresos Recurrentes Mensuales):** $7,830.00 CAD asegurados.\n• **Impacto Comercial:** El 68% de las reservas mensuales se completan automáticamente sin gasto publicitario.";
+    }
+
+    // Weather & snowstorm rescheduling
+    if (
+      s.includes("weather") ||
+      s.includes("clima") ||
+      s.includes("nieve") ||
+      s.includes("snow") ||
+      s.includes("storm") ||
+      s.includes("tormenta") ||
+      s.includes("reschedule") ||
+      s.includes("reprogram")
+    ) {
+      return "❄️ **Protocolo de Tormentas de Nieve (Toronto Winter Protocol):**\n\n• Monitoreo activo conectado con Environment Canada.\n• En alertas de nieve en Don Valley Parkway o Gardiner Expressway, el asistente puede reorganizar automáticamente hasta 3 citas al cluster de Midtown del día siguiente sin penalización para el cliente.\n• Avisos por SMS y correo listos para disparar con 1 clic.";
+    }
+
+    // Vaccines & veterinary compliance
+    if (
+      s.includes("vaccin") ||
+      s.includes("vacun") ||
+      s.includes("rabia") ||
+      s.includes("bordetella") ||
+      s.includes("audit") ||
+      s.includes("compliance")
+    ) {
+      return "🩺 **Auditoría de Vacunación (Normativa Veterinaria Ontario):**\n\n• **Total mascotas registradas:** 138 perros.\n• **Cartilla 100% al día:** 131 perros (94.9%).\n• **Próximas a vencer (<14 días):** 7 perros (notificaciones preventivas automáticas enviadas a sus dueños para actualizar el certificado digital).";
+    }
+
+    // MoeGo migration
+    if (
+      s.includes("moego") ||
+      s.includes("migra") ||
+      s.includes("sync")
+    ) {
+      return "🔄 **Sincronización y Estado de MoeGo:**\n\n• El 100% de expedientes de clientes, notas de peinado y perfiles caninos fueron migrados con éxito a nuestro sistema propio.\n• Operamos de forma nativa e independiente, ahorrando comisiones de terceros y con control total sobre los datos.";
+    }
+
+    return "👨‍💼 **Copiloto de Operaciones Qimmiq Online:**\n\nPuedo informarte en vivo sobre ingresos ($860 hoy / $21,280 mes), telemetría de la Van #1 (agua 72%), códigos Latchkey activos, saturación de rutas por barrios o auditoría de vacunas. ¿Qué deseas consultar?";
+  }
+
+  // ========================================================
+  // CLIENT CONCIERGE REPLIES
+  // ========================================================
+
   // Operating hours & Sundays
-  if (s.includes("sunday") || s.includes("domingo") || s.includes("hour") || s.includes("horario") || s.includes("open") || s.includes("abierto")) {
-    return "Yes! We are open 7 days a week, Monday through Sunday from 8:30 AM to 6:00 PM. Weekends are among our most popular times for stress-free doorstep grooming across Toronto.";
+  if (
+    s.includes("sunday") ||
+    s.includes("domingo") ||
+    s.includes("hour") ||
+    s.includes("horario") ||
+    s.includes("open") ||
+    s.includes("abierto") ||
+    s.includes("dias") ||
+    s.includes("días")
+  ) {
+    return "¡Sí! Atendemos los 7 días de la semana, de **lunes a domingo de 8:30 AM a 6:00 PM**. Los fines de semana son especialmente solicitados para consentir a tu perro en la puerta de tu hogar sin que tengas que desplazarte ni interrumpir tus planes familiares.";
   }
 
   // Service zones & Toronto coverage
-  if (s.includes("area") || s.includes("zone") || s.includes("neighborhood") || s.includes("where") || s.includes("etobicoke") || s.includes("mississauga") || s.includes("markham") || s.includes("scarborough") || s.includes("midtown") || s.includes("donde")) {
-    return "We service the entire Toronto core and GTA: Midtown, The Annex, Rosedale, Leaside, Downtown Toronto, East York, Etobicoke, North York, York, plus select zones in Mississauga, Markham, Scarborough, and Richmond Hill!";
-  }
-
-  // Subscriptions & VIP Club
-  if (s.includes("subscri") || s.includes("suscrip") || s.includes("vip") || s.includes("plan") || s.includes("membership") || s.includes("save")) {
-    return "Our VIP Pooch Club offers 4, 6, and 8-week recurring routines with 15% lifetime savings (saving up to $250+/yr). Members get guaranteed peak weekend slots, free organic Blueberry Facials ($15 value every visit), the same dedicated groomer, and zero cancellation penalties!";
-  }
-
-  // In-house booking vs MoeGo
-  if (s.includes("moego") || s.includes("book") || s.includes("appoin") || s.includes("cita") || s.includes("reserva") || s.includes("agenda")) {
-    return "You do NOT need MoeGo! You can book directly right on our site or through your private Customer Portal in under 90 seconds. We have full in-house scheduling with live route optimization, instant quote calculations, and calendar sync.";
-  }
-
-  // Vaccinations & Pet Passport
-  if (s.includes("vaccin") || s.includes("vacun") || s.includes("rabies") || s.includes("rabia") || s.includes("bordetella") || s.includes("shot")) {
-    return "In accordance with Ontario veterinary standards, we require active Rabies, Bordetella (kennel cough), and DHPP vaccinations. You can track your pup's expiration dates and receive automatic renewal alerts directly inside your Customer Portal Pet Passport.";
+  if (
+    s.includes("area") ||
+    s.includes("zone") ||
+    s.includes("zona") ||
+    s.includes("neighborhood") ||
+    s.includes("barrio") ||
+    s.includes("where") ||
+    s.includes("donde") ||
+    s.includes("dónde") ||
+    s.includes("etobicoke") ||
+    s.includes("mississauga") ||
+    s.includes("markham") ||
+    s.includes("scarborough") ||
+    s.includes("midtown") ||
+    s.includes("rosedale") ||
+    s.includes("annex")
+  ) {
+    return "Cubrimos todo el centro de Toronto y el GTA: Midtown, The Annex, Rosedale, Leaside, Downtown Toronto, East York, Etobicoke, North York, York, más rutas programadas en Mississauga, Markham, Scarborough y Richmond Hill. Si nos indicas tu código postal, te decimos al instante qué días estamos en tu calle.";
   }
 
   // Pricing & breeds
-  if (s.includes("doodle") || s.includes("price") || s.includes("cost") || s.includes("precio") || s.includes("cuanto") || s.includes("rate")) {
-    return "A 30lb Goldendoodle falls in our Medium tier. The Full Groom & Scissor Styling is approximately $175–$185 CAD, including warm organic hydrobath, blueberry facial, ear cleansing, sanitary trim, and precision scissor hand-finish. VIP members save 15% ($148 CAD).";
+  if (
+    s.includes("doodle") ||
+    s.includes("price") ||
+    s.includes("cost") ||
+    s.includes("precio") ||
+    s.includes("cuanto") ||
+    s.includes("cuánto") ||
+    s.includes("tarifa") ||
+    s.includes("rate") ||
+    s.includes("poodle") ||
+    s.includes("pomeranian") ||
+    s.includes("frenchie") ||
+    s.includes("bulldog") ||
+    s.includes("golden") ||
+    s.includes("shih tzu")
+  ) {
+    return "Nuestras tarifas transparentes todo incluido:\n• **Perros Pequeños (<20 lbs, ej. Pomeranian, Shih Tzu):** $120–$140 CAD.\n• **Perros Medianos (20–45 lbs, ej. Goldendoodle, Frenchie):** $145–$185 CAD.\n• **Perros Grandes (45–70 lbs, ej. Golden Retriever, Labrador):** $185–$225 CAD.\n\n*Incluye:* Hidrobaño tibio orgánico, secado suave a mano sin jaulas, Blueberry Facial desmanchador, corte estilizado a tijera, corte y limado de uñas, y limpieza de oídos. ¡Los miembros del Club VIP ahorran un 15% de por vida!";
+  }
+
+  // Subscriptions & VIP Club
+  if (
+    s.includes("subscri") ||
+    s.includes("suscrip") ||
+    s.includes("vip") ||
+    s.includes("plan") ||
+    s.includes("membership") ||
+    s.includes("membres") ||
+    s.includes("descuento") ||
+    s.includes("ahorro") ||
+    s.includes("save")
+  ) {
+    return "Con el **Club VIP Pooch** disfrutas de una rutina periódica cada 4, 6 u 8 semanas con un **15% de descuento permanente** (ahorras hasta $250+ CAD al año). Además recibes: horarios garantizados en fin de semana, Facial de Arándanos orgánico GRATIS en cada visita (valor $15 CAD), el mismo peluquero de confianza para tu perrito, y cero penalizaciones por reprogramación.";
+  }
+
+  // In-house booking vs MoeGo
+  if (
+    s.includes("moego") ||
+    s.includes("book") ||
+    s.includes("appoin") ||
+    s.includes("cita") ||
+    s.includes("reserva") ||
+    s.includes("agenda")
+  ) {
+    return "¡No necesitas usar MoeGo! Puedes reservar directamente desde nuestra web o app en menos de 90 segundos. Seleccionas el tamaño de tu perro, el paquete deseado, eliges fecha y hora con optimización de ruta en tiempo real, y recibes confirmación inmediata por SMS y correo.";
+  }
+
+  // Vaccinations & Pet Passport
+  if (
+    s.includes("vaccin") ||
+    s.includes("vacun") ||
+    s.includes("rabies") ||
+    s.includes("rabia") ||
+    s.includes("bordetella") ||
+    s.includes("shot") ||
+    s.includes("requisito")
+  ) {
+    return "Por normativa de bienestar animal y salud en Ontario, requerimos vacunas vigentes de **Rabia, Bordetella (tos de las perreras) y DHPP**. Puedes guardar y consultar las fechas de vencimiento de tu perro en tu Pasaporte de Salud digital dentro del Portal de Clientes, con alertas automáticas antes de que caduquen.";
   }
 
   // Latchkey service
-  if (s.includes("latchkey") || s.includes("lockbox") || s.includes("key") || s.includes("contactless") || s.includes("work")) {
-    return "Latchkey service lets you stay at work or relax inside: share your lockbox or smart-lock code securely, our bonded groomer collects your pup, grooms them 1-on-1 inside our mobile spa, returns them safely inside and sends you a digital photo report card. Each stop has its own encrypted access code revealed only upon arrival.";
+  if (
+    s.includes("latchkey") ||
+    s.includes("lockbox") ||
+    s.includes("key") ||
+    s.includes("llave") ||
+    s.includes("contactless") ||
+    s.includes("sin contacto") ||
+    s.includes("trabajo")
+  ) {
+    return "Nuestro servicio **Latchkey** te permite no estar en casa o seguir trabajando tranquilamente mientras consentimos a tu perro. Compartes tu código de smart-lock o lockbox de forma 100% cifrada. Nuestro peluquero certificado recoge a tu perro, lo atiende en nuestro spa móvil 1-on-1, lo regresa a salvo a tu hogar y te envía fotos y un Pooch Report Card digital inmediatamente.";
+  }
+
+  // Payment methods
+  if (
+    s.includes("pay") ||
+    s.includes("pago") ||
+    s.includes("interac") ||
+    s.includes("apple") ||
+    s.includes("google") ||
+    s.includes("tarjeta") ||
+    s.includes("card") ||
+    s.includes("stripe")
+  ) {
+    return "Aceptamos todos los métodos de pago canadienses más cómodos y seguros: **Interac e-Transfer, Apple Pay, Google Pay y tarjetas de crédito/débito (Visa, Mastercard, American Express)**. Todos los pagos se procesan de forma cifrada mediante Stripe sin necesidad de efectivo en la van.";
   }
 
   // Trailer capabilities & fresh water
-  if (s.includes("water") || s.includes("van") || s.includes("tank") || s.includes("agua") || s.includes("trailer")) {
-    return mode === "admin"
-      ? "Van #1 freshwater tank: 72% (≈ 95 L). Battery bank: 88%. Generator: standby. Next route stop: Midtown (M4P)."
-      : "Our luxury trailer is 100% self-sufficient — we bring our own heated fresh water, quiet eco-power, and temperature-controlled air. We never need your electrical outlets or garden hose!";
+  if (
+    s.includes("water") ||
+    s.includes("van") ||
+    s.includes("tank") ||
+    s.includes("agua") ||
+    s.includes("enchufe") ||
+    s.includes("trailer")
+  ) {
+    return "Nuestro tráiler vintage de lujo es 100% autosuficiente: llevamos nuestra propia agua tibia filtrada, energía eco-solar silenciosa y climatización interior. **Nunca necesitamos conectarnos a tu manguera ni a los enchufes de tu casa**.";
   }
 
   // Cancellation policy
-  if (s.includes("cancel") || s.includes("polic") || s.includes("politica")) {
-    return "We send reminders at 48h and 24h. Standard cancellations with less than 24h notice incur a 50% late fee. However, VIP Club members enjoy zero cancellation fees, and we always reschedule Toronto severe winter snowstorms with zero penalty.";
+  if (
+    s.includes("cancel") ||
+    s.includes("polic") ||
+    s.includes("politica") ||
+    s.includes("política")
+  ) {
+    return "Enviamos recordatorios automáticos por SMS 48h y 24h antes. Las cancelaciones con menos de 24h tienen una tarifa del 50%, pero los miembros del Club VIP disfrutan de cancelaciones gratuitas ilimitadas. Y en caso de tormentas de nieve severas en Toronto, reprogramamos a todos con cero costo.";
   }
 
   // Real reviews & social proof
-  if (s.includes("review") || s.includes("reseña") || s.includes("google") || s.includes("real") || s.includes("instagram")) {
-    return "All our reviews are 100% genuine verified 5.0-star experiences from real Toronto dog owners across Rosedale, Midtown, Annex, and Downtown. You can also check our Instagram @thefreshpooch to see our actual video reels, happy client pups, and van footage!";
+  if (
+    s.includes("review") ||
+    s.includes("reseña") ||
+    s.includes("google") ||
+    s.includes("real") ||
+    s.includes("instagram") ||
+    s.includes("opinion") ||
+    s.includes("opinión")
+  ) {
+    return "Todas nuestras reseñas provienen 100% de clientes y perros reales verificados en Toronto (Rosedale, Midtown, The Annex, etc.) con una calificación promedio de 4.9★. También puedes seguir nuestro Instagram **@thefreshpooch** para ver videos reales diarios de la van, el proceso de baño y los perros felices con sus report cards.";
   }
 
-  // Admin-specific copilot
-  if (mode === "admin" && (s.includes("revenue") || s.includes("today") || s.includes("kpi"))) {
-    return "Today: 5 Sunday grooms scheduled, $860 CAD revenue projected. Van #1 freshwater at 72%. All 5 stops have active latchkey codes loaded.";
-  }
-  if (mode === "admin" && s.includes("reschedule")) {
-    return "Done — I've drafted SMS reschedule offers for afternoon routes. You can review and broadcast them in Groomer Mode.";
-  }
-
-  return mode === "admin"
-    ? "I can show live revenue, van tank levels, zone route density, MoeGo sync status, or latchkey codes. What do you need?"
-    : "Happy to help! I can answer questions about pricing, Sunday hours, Toronto neighborhoods, our VIP subscription savings, or book your next groom.";
+  return "🐾 ¡Hola! Soy **Qimmiq**, tu Asistente de Spa Canino en Toronto. Puedo ayudarte con precios exactos para tu raza, agendar citas en menos de 90 segundos, explicar nuestro servicio Latchkey sin contacto o resolver dudas sobre el Club VIP y vacunas. ¿Cómo puedo consentir a tu perro hoy?";
 }
 
-export function QimmiqAssistant() {
+export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("client");
+  const [mode, setMode] = useState<Mode>(isAdmin ? "admin" : "client");
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [welcomeToast, setWelcomeToast] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
-    { from: "ai", text: "Woof! I'm Qimmiq, your Canadian Dog Service AI. How can I help you and your pooch today? 🐾" },
+    {
+      from: "ai",
+      text: isAdmin
+        ? "👨‍💼 ¡Hola Director de Operaciones! Soy Qimmiq, tu Copiloto de Flota y Gestión. Puedo responderte sobre ingresos en vivo, telemetría de la Van #1, códigos Latchkey del día y optimización de rutas en Toronto. ⚡"
+        : "Woof! I'm Qimmiq, your Toronto Mobile Dog Spa Concierge. How can I help you and your pooch today? 🐾 (¡Hablo español e inglés!)",
+    },
   ]);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs, typing]);
+
+  useEffect(() => {
+    setMode(isAdmin ? "admin" : "client");
+    setMsgs([
+      {
+        from: "ai",
+        text: isAdmin
+          ? "👨‍💼 ¡Hola Director de Operaciones! Soy Qimmiq, tu Copiloto de Flota y Gestión. Puedo responderte sobre ingresos en vivo, telemetría de la Van #1, códigos Latchkey del día y optimización de rutas en Toronto. ⚡"
+          : "Woof! I'm Qimmiq, your Toronto Mobile Dog Spa Concierge. How can I help you and your pooch today? 🐾 (¡Hablo español e inglés!)",
+      },
+    ]);
+  }, [isAdmin]);
 
   useEffect(() => {
     // Show welcoming speech bubble 1.5 seconds after page loads
@@ -126,6 +374,8 @@ export function QimmiqAssistant() {
     }
   };
 
+  const prompts = mode === "admin" ? ADMIN_PROMPTS : CLIENT_PROMPTS;
+
   return (
     <>
       {/* Welcome Speech Bubble */}
@@ -140,7 +390,7 @@ export function QimmiqAssistant() {
             <div className="flex-1 text-left">
               <div className="flex items-center justify-between">
                 <span className="font-serif text-xs font-bold text-teal flex items-center gap-1">
-                  <Sparkles className="h-3 w-3 text-gold" /> Qimmiq AI Concierge
+                  <Sparkles className="h-3 w-3 text-gold" /> {isAdmin ? "Qimmiq Ops Copilot" : "Qimmiq AI Concierge"}
                 </span>
                 <button
                   onClick={(e) => {
@@ -160,7 +410,11 @@ export function QimmiqAssistant() {
                   setWelcomeToast(false);
                 }}
               >
-                👋 <strong>¡Hola!</strong> Soy <strong>Qimmiq</strong>. Pregúntame sobre precios para la raza de tu perro, qué incluye cada paquete de spa o cómo reservar en Toronto. 🐾
+                {isAdmin ? (
+                  <>⚡ <strong>¡Hola Director de Operaciones!</strong> Revisa ingresos de hoy ($860 CAD), tanques de agua (72%), códigos Latchkey o telemetría de ruta. 🚐</>
+                ) : (
+                  <>👋 <strong>¡Hola!</strong> Soy <strong>Qimmiq</strong>. Pregúntame sobre precios para la raza de tu perro, qué incluye cada paquete de spa o cómo reservar en Toronto. 🐾</>
+                )}
               </p>
               <button
                 onClick={() => {
@@ -169,7 +423,7 @@ export function QimmiqAssistant() {
                 }}
                 className="mt-2 inline-flex items-center gap-1 text-[0.72rem] font-bold text-teal hover:underline"
               >
-                Chatear con Qimmiq &rarr;
+                {isAdmin ? "Abrir Copiloto de Operaciones →" : "Chatear con Qimmiq →"}
               </button>
             </div>
           </div>
@@ -201,12 +455,11 @@ export function QimmiqAssistant() {
         </div>
         <div className="text-left leading-tight">
           <div className="text-xs text-gold flex items-center gap-1 font-semibold">
-            <Sparkles className="h-3 w-3" /> Dog Service AI
+            <Sparkles className="h-3 w-3" /> {mode === "admin" ? "Ops Copilot AI" : "Dog Service AI"}
           </div>
           <span className="text-sm">Ask Qimmiq</span>
         </div>
       </button>
-
 
       {open && <div className="fixed inset-0 z-40 bg-ink/30 backdrop-blur-sm" onClick={() => setOpen(false)} />}
       <aside
@@ -268,7 +521,7 @@ export function QimmiqAssistant() {
               )}
               <div
                 className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                  "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-line",
                   m.from === "user" ? "bg-ink text-ink-foreground rounded-br-none" : "bg-card border border-border rounded-bl-none shadow-sm",
                 )}
               >
@@ -287,7 +540,7 @@ export function QimmiqAssistant() {
 
         <div className="border-t border-border p-4 bg-muted/20">
           <div className="mb-3 flex flex-wrap gap-2">
-            {PROMPTS.map((p) => (
+            {prompts.map((p) => (
               <button
                 key={p}
                 onClick={() => send(p)}
@@ -307,7 +560,7 @@ export function QimmiqAssistant() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Qimmiq anything…"
+              placeholder={mode === "admin" ? "Pregúntale a Qimmiq sobre ingresos, van, códigos o rutas…" : "Pregúntale a Qimmiq sobre precios, razas, domingos…"}
               className="flex-1 rounded-full border border-input bg-background px-4 py-2.5 text-sm outline-none focus:border-ring shadow-sm"
             />
             <button
@@ -323,4 +576,3 @@ export function QimmiqAssistant() {
     </>
   );
 }
-

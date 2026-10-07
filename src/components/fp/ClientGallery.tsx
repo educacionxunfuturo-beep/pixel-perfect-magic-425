@@ -61,7 +61,10 @@ const PHOTOS: GalleryPhoto[] = [
   },
 ];
 
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
+
 export function ClientGallery() {
+  const { count } = useLiveGroomCounter(648);
   return (
     <section className="border-t border-border bg-card/60 py-16">
       <div className="mx-auto max-w-7xl px-4 md:px-6">
@@ -74,7 +77,7 @@ export function ClientGallery() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <Pill tone="gold"><Heart className="h-3 w-3 fill-current" /> 600+ Happy Dogs</Pill>
+            <Pill tone="gold"><Heart className="h-3 w-3 fill-current" /> <strong className="tabular-nums">{count}</strong> Happy Dogs</Pill>
             <a
               href="https://instagram.com/thefreshpooch"
               target="_blank"

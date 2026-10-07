@@ -39,7 +39,13 @@ const VAN = [
   { label: "Next service", value: "Dec 12", icon: Wrench, note: "Oil + generator check" },
 ];
 
-export function AdminSurface({ onClientLogin }: { onClientLogin?: () => void }) {
+export function AdminSurface({
+  onClientLogin,
+  onAuthChange,
+}: {
+  onClientLogin?: () => void;
+  onAuthChange?: (isAuth: boolean) => void;
+}) {
   const [range, setRange] = useState<"week" | "month">("week");
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [email, setEmail] = useState("");
@@ -53,6 +59,7 @@ export function AdminSurface({ onClientLogin }: { onClientLogin?: () => void }) 
       password.trim() === "pooch2026"
     ) {
       setIsAuthenticated(true);
+      onAuthChange?.(true);
       setError("");
     } else if (email.trim().toLowerCase().includes("@") && !email.trim().toLowerCase().includes("admin")) {
       // If customer enters their pet parent account here, switch to client portal
@@ -70,6 +77,7 @@ export function AdminSurface({ onClientLogin }: { onClientLogin?: () => void }) 
     setEmail("admin@thefreshpooch.ca");
     setPassword("pooch2026");
     setIsAuthenticated(true);
+    onAuthChange?.(true);
     setError("");
   };
 
@@ -179,7 +187,10 @@ export function AdminSurface({ onClientLogin }: { onClientLogin?: () => void }) 
           <Pill tone="success" className="ml-1 text-[10px]">Open 7 Days Active</Pill>
         </div>
         <button
-          onClick={() => setIsAuthenticated(false)}
+          onClick={() => {
+            setIsAuthenticated(false);
+            onAuthChange?.(false);
+          }}
           className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition"
         >
           <LogOut className="h-3.5 w-3.5" /> Lock / Sign Out

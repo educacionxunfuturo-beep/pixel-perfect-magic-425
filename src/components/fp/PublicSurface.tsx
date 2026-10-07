@@ -12,6 +12,7 @@ import { SubscriptionSection } from "./SubscriptionSection";
 import { PetParentAppSection } from "./PetParentAppSection";
 import { SpaReels } from "./SpaReels";
 import { ClientGallery } from "./ClientGallery";
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 
 const BREEDS = [
   { name: "Goldendoodle", factor: 1.15 },
@@ -341,6 +342,7 @@ function BeforeAfter() {
 
 export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
   const [preset, setPreset] = useState<{ id: PackageId; n: number } | null>(null);
+  const { count, justIncremented, lastActivity } = useLiveGroomCounter(648);
   const select = (id: PackageId) => {
     setPreset((p) => ({ id, n: (p?.n ?? 0) + 1 }));
     document.getElementById("quote")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -374,9 +376,23 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
               height={848}
               className="aspect-[16/10] w-full object-cover transition-transform duration-700 hover:scale-[1.02]"
             />
-            <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-card/95 px-3 py-1.5 text-xs font-bold backdrop-blur shadow-sm">
-              <Star className="h-3.5 w-3.5 fill-amber text-amber" /> 5.0 • 600+ Happy Toronto Pooches
+            <div className={cn(
+              "absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-card/95 px-3.5 py-1.5 text-xs font-bold backdrop-blur shadow-sm border border-border/80 transition-all duration-300",
+              justIncremented && "scale-105 ring-2 ring-success bg-success-soft"
+            )}>
+              <Star className="h-3.5 w-3.5 fill-amber text-amber" />
+              <span>5.0 • <strong className="text-teal font-extrabold tabular-nums">{count}</strong> Happy Toronto Pooches</span>
+              <span className="relative flex h-2 w-2 ml-1">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+              </span>
             </div>
+            {justIncremented && (
+              <div className="animate-fade-up absolute bottom-12 left-4 z-20 flex items-center gap-1.5 rounded-full bg-ink/90 px-3 py-1 text-[11px] font-semibold text-white shadow-lift backdrop-blur">
+                <Sparkles className="h-3 w-3 text-gold" />
+                <span>Just groomed: {lastActivity.dog} in {lastActivity.area}</span>
+              </div>
+            )}
             <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1 text-xs font-semibold text-teal backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
               100% Autonomous Spa

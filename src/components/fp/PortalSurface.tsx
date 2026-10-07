@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { dbService } from "@/lib/supabase";
 import { dispatchNotification } from "@/lib/notifications";
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 
 interface PetProfile {
   id: string;
@@ -74,6 +75,7 @@ const STAGES = [
 ];
 
 export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
+  const { count } = useLiveGroomCounter(648);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [userEmail, setUserEmail] = useState("jordan.m@torontoparents.ca");
@@ -247,7 +249,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Pill tone="teal">Client Advantages</Pill>
-                <span className="text-[11px] font-semibold text-muted-foreground">Why 600+ Toronto pet parents register</span>
+                <span className="text-[11px] font-semibold text-muted-foreground">Why {count}+ Toronto pet parents register</span>
               </div>
               <h2 className="font-serif text-2xl font-bold text-ink">
                 Your Dog's Personal Concierge on Autopilot

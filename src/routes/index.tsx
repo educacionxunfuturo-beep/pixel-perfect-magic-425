@@ -32,6 +32,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const [surface, setSurface] = useState<Surface>("public");
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,10 +41,15 @@ function Index() {
         {surface === "public" && <PublicSurface onOpenPortal={() => setSurface("portal")} />}
         {surface === "portal" && <PortalSurface onAdminLogin={() => setSurface("admin")} />}
         {surface === "groomer" && <GroomerSurface />}
-        {surface === "admin" && <AdminSurface onClientLogin={() => setSurface("portal")} />}
+        {surface === "admin" && (
+          <AdminSurface
+            onClientLogin={() => setSurface("portal")}
+            onAuthChange={setIsAdminAuthenticated}
+          />
+        )}
       </main>
       <SiteFooter />
-      <QimmiqAssistant />
+      <QimmiqAssistant isAdmin={surface === "admin" && isAdminAuthenticated} />
     </div>
   );
 }
