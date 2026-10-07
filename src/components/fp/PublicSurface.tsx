@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { Packages, PressBanner, Reviews, Faq, PACKAGES, type PackageId } from "./PublicSections";
 import { SubscriptionSection } from "./SubscriptionSection";
+import { PetParentAppSection } from "./PetParentAppSection";
 import { SpaReels } from "./SpaReels";
 import { ClientGallery } from "./ClientGallery";
 
@@ -338,7 +339,7 @@ function BeforeAfter() {
   );
 }
 
-export function PublicSurface() {
+export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
   const [preset, setPreset] = useState<{ id: PackageId; n: number } | null>(null);
   const select = (id: PackageId) => {
     setPreset((p) => ({ id, n: (p?.n ?? 0) + 1 }));
@@ -391,6 +392,7 @@ export function PublicSurface() {
 
       <Packages onSelect={select} />
       <SubscriptionSection />
+      <PetParentAppSection onOpenPortal={onOpenPortal} />
       <PressBanner />
       <SpaReels />
       <section className="border-t border-border bg-secondary/50">

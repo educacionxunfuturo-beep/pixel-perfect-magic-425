@@ -37,7 +37,7 @@ function Index() {
     <div className="min-h-screen bg-background">
       <TopNav surface={surface} onChange={setSurface} />
       <main>
-        {surface === "public" && <PublicSurface />}
+        {surface === "public" && <PublicSurface onOpenPortal={() => setSurface("portal")} />}
         {surface === "portal" && <PortalSurface />}
         {surface === "groomer" && <GroomerSurface />}
         {surface === "admin" && <AdminSurface />}

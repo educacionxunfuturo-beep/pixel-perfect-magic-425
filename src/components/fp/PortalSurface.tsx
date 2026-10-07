@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import {
   CalendarHeart, Crown, Upload, Truck, Check, Navigation, Bath, Sparkles, MapPin,
   ShieldCheck, AlertTriangle, KeyRound, Eye, EyeOff, Clock, User, Phone, Mail,
-  Calendar, FileText, Plus, ChevronRight, LogOut, CheckCircle2, Heart, Award
+  Calendar, FileText, Plus, ChevronRight, LogOut, CheckCircle2, Heart, Award,
+  Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle
 } from "lucide-react";
 import barnaby from "@/assets/barnaby.jpg";
 import { cn } from "@/lib/utils";
@@ -73,20 +74,27 @@ const STAGES = [
 ];
 
 export function PortalSurface() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [userEmail, setUserEmail] = useState("jordan.m@torontoparents.ca");
   const [userName, setUserName] = useState("Jordan Miller");
   const [userPhone, setUserPhone] = useState("(416) 555-0199");
   const [userAddress, setUserAddress] = useState("142 Roehampton Ave, Midtown Toronto M4P 1R4");
 
-  const [activeTab, setActiveTab] = useState<"overview" | "book" | "vaccines" | "history" | "vip">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "book" | "vaccines" | "history" | "rewards" | "matting" | "vip">("overview");
   const [pet, setPet] = useState<PetProfile>(DEFAULT_PET);
   const [stage, setStage] = useState(1);
   const [autoStage, setAutoStage] = useState(true);
   const [revealCode, setRevealCode] = useState(false);
   const [editingCode, setEditingCode] = useState(false);
   const [codeDraft, setCodeDraft] = useState(pet.latchkeyCode);
+
+  // Loyalty Paw Points & Advisor States
+  const [pawPoints, setPawPoints] = useState(380);
+  const [redeemedReward, setRedeemedReward] = useState<string | null>(null);
+  const [selectedCoatType, setSelectedCoatType] = useState("doodle");
+  const [weeksSinceGroom, setWeeksSinceGroom] = useState(5);
+  const [showPwaBanner, setShowPwaBanner] = useState(true);
 
   // Native Booking state
   const [bookingDate, setBookingDate] = useState("2026-10-18");
@@ -107,96 +115,180 @@ export function PortalSurface() {
 
   if (!isAuthenticated) {
     return (
-      <div className="animate-fade-up mx-auto max-w-md px-4 py-16">
-        <div className="card-surface p-8 shadow-lift border border-border">
-          <div className="text-center">
-            <Pill tone="gold" className="mb-3">Toronto Pet Parent Portal</Pill>
-            <h1 className="font-serif text-3xl font-semibold text-ink">
-              {authMode === "login" ? "Sign In to Your Dashboard" : "Create Pet Parent Account"}
-            </h1>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {authMode === "login"
-                ? "Track live grooms, manage Latchkey access & vaccine reminders."
-                : "Book 100% cage-free mobile grooming right to your Toronto doorstep."}
-            </p>
+      <div className="animate-fade-up mx-auto max-w-5xl px-4 py-12 md:py-16">
+        <div className="grid gap-8 lg:grid-cols-12 items-stretch">
+          {/* Left Column: Sign In / Sign Up Card */}
+          <div className="card-surface p-6 sm:p-8 shadow-lift border border-border lg:col-span-6 flex flex-col justify-between">
+            <div>
+              <div className="text-center lg:text-left">
+                <Pill tone="gold" className="mb-3">Toronto Pet Parent Portal</Pill>
+                <h1 className="font-serif text-3xl font-semibold text-ink">
+                  {authMode === "login" ? "Sign In to Your Dashboard" : "Create Pet Parent Account"}
+                </h1>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {authMode === "login"
+                    ? "Track live grooms, manage Latchkey access & vaccine reminders."
+                    : "Register your dog for 100% cage-free mobile grooming right to your Toronto doorstep."}
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setIsAuthenticated(true);
+                }}
+                className="mt-6 space-y-4"
+              >
+                {authMode === "signup" && (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={userName}
+                      onChange={(e) => setUserName(e.target.value)}
+                      placeholder="e.g. Jordan Miller"
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Email Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="you@email.com"
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Password</label>
+                  <input
+                    type="password"
+                    required
+                    defaultValue="••••••••"
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
+                  />
+                </div>
+                {authMode === "signup" && (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Toronto Service Address</label>
+                    <input
+                      type="text"
+                      required
+                      value={userAddress}
+                      onChange={(e) => setUserAddress(e.target.value)}
+                      placeholder="e.g. 142 Roehampton Ave, Midtown M4P 1R4"
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="mt-4 w-full rounded-full bg-teal py-3 text-sm font-bold text-white shadow-lift transition-transform hover:scale-[1.02]"
+                >
+                  {authMode === "login" ? "Sign In" : "Create Account & Enter Portal"}
+                </button>
+              </form>
+
+              <div className="mt-4 border-t border-border pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
+                  className="text-xs font-semibold text-teal hover:underline"
+                >
+                  {authMode === "login"
+                    ? "Don't have an account? Sign up for free"
+                    : "Already have an account? Sign in here"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl bg-secondary/70 p-4 border border-border text-center">
+              <span className="font-bold text-xs text-ink block mb-1">🐾 Instant Demo Access</span>
+              <p className="text-[11px] text-muted-foreground mb-3">
+                Want to explore the client portal right away? Click below to access Jordan & Barnaby's prefilled profile with 380 Paw Points.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsAuthenticated(true)}
+                className="w-full rounded-full bg-ink px-4 py-2.5 text-xs font-bold text-white hover:bg-ink/90 transition shadow-sm"
+              >
+                Log In As Demo Client (Jordan & Barnaby)
+              </button>
+            </div>
           </div>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setIsAuthenticated(true);
-            }}
-            className="mt-6 space-y-4"
-          >
-            {authMode === "signup" && (
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="e.g. Jordan Miller"
-                  className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
-                />
-              </div>
-            )}
+          {/* Right Column: Why Create an Account / Benefits Showcase */}
+          <div className="rounded-3xl bg-gradient-to-br from-teal/10 via-card to-gold/10 p-6 sm:p-8 border border-border lg:col-span-6 flex flex-col justify-between">
             <div>
-              <label className="text-xs font-semibold text-muted-foreground">Email Address</label>
-              <input
-                type="email"
-                required
-                value={userEmail}
-                onChange={(e) => setUserEmail(e.target.value)}
-                placeholder="you@email.com"
-                className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground">Password</label>
-              <input
-                type="password"
-                required
-                defaultValue="••••••••"
-                className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
-              />
-            </div>
-            {authMode === "signup" && (
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Toronto Service Address</label>
-                <input
-                  type="text"
-                  required
-                  value={userAddress}
-                  onChange={(e) => setUserAddress(e.target.value)}
-                  placeholder="e.g. 142 Roehampton Ave, Midtown M4P 1R4"
-                  className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
-                />
+              <div className="flex items-center gap-2 mb-3">
+                <Pill tone="teal">Client Advantages</Pill>
+                <span className="text-[11px] font-semibold text-muted-foreground">Why 600+ Toronto pet parents register</span>
               </div>
-            )}
+              <h2 className="font-serif text-2xl font-bold text-ink">
+                Your Dog's Personal Concierge on Autopilot
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Having an account keeps all your pooch's records organized so you never have to repeat styling instructions or miss a vaccine booster.
+              </p>
 
-            <button
-              type="submit"
-              className="mt-4 w-full rounded-full bg-teal py-3 text-sm font-bold text-white shadow-lift transition-transform hover:scale-[1.02]"
-            >
-              {authMode === "login" ? "Sign In" : "Create Account & Enter Portal"}
-            </button>
-          </form>
+              <div className="mt-6 space-y-3.5">
+                {[
+                  {
+                    icon: Heart,
+                    title: "Digital Pet Passport (#FP-ID)",
+                    desc: "Saves coat type, preferred scissor cut, temperament notes, and favorite groomer forever.",
+                  },
+                  {
+                    icon: ShieldCheck,
+                    title: "Ontario Vaccine Expiry Vault",
+                    desc: "Automated 30-day alerts for Rabies, Bordetella, and DHPP so you stay compliant with city bylaws.",
+                  },
+                  {
+                    icon: KeyRound,
+                    title: "Encrypted Latchkey Passcode",
+                    desc: "Grooming while you work: lockbox or condo codes are revealed only to your certified groomer on day of service.",
+                  },
+                  {
+                    icon: Gift,
+                    title: "Fresh Rewards: Paw Points Club",
+                    desc: "Earn points on every dollar spent. Redeem for free blueberry facials, winter salt balms, and birthday surprises.",
+                  },
+                  {
+                    icon: Scissors,
+                    title: "Coat Matting Risk Advisor",
+                    desc: "Free diagnostic tool calculating matting danger between grooms tailored for Toronto weather.",
+                  },
+                  {
+                    icon: Smartphone,
+                    title: "1-Tap Booking (No MoeGo Needed)",
+                    desc: "Direct van dispatch with Apple Pay, Google Pay, or Interac in under 30 seconds.",
+                  },
+                ].map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={idx} className="flex items-start gap-3 rounded-xl bg-card/80 p-3 border border-border/70 shadow-sm">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal text-white">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-foreground">{item.title}</div>
+                        <div className="text-[11px] text-muted-foreground leading-relaxed">{item.desc}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
-          <div className="mt-6 border-t border-border pt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
-              className="text-xs font-semibold text-teal hover:underline"
-            >
-              {authMode === "login"
-                ? "Don't have an account? Sign up for free"
-                : "Already have an account? Sign in here"}
-            </button>
-          </div>
-
-          <div className="mt-4 rounded-xl bg-secondary/50 p-3 text-center text-xs text-muted-foreground">
-            <span className="font-semibold text-ink">Demo One-Click Access:</span> Click "Sign In" with pre-filled credentials to explore Jordan & Barnaby's live portal!
+            <div className="mt-6 pt-4 border-t border-border/80 flex items-center justify-between text-xs text-muted-foreground">
+              <span>🔒 256-bit Encrypted Client Data</span>
+              <span>🇨🇦 Toronto, Midtown & GTA</span>
+            </div>
           </div>
         </div>
       </div>
@@ -238,12 +330,53 @@ export function PortalSurface() {
         </div>
       </div>
 
+      {/* PWA Mobile App Download Prompt */}
+      {showPwaBanner && (
+        <div className="mb-6 rounded-2xl border border-teal/40 bg-gradient-to-r from-sage-soft/90 via-teal-soft/40 to-gold-soft/40 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-teal text-white shadow-sm">
+              <Smartphone className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-ink">Install The Fresh Pooch Mobile App</span>
+                <span className="rounded-full bg-gold/40 text-ink text-[10px] font-bold px-2 py-0.5">+100 Paw Points</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Add to your iPhone (Safari &gt; Share &gt; Add to Home Screen) or Android (Chrome &gt; Install App) for 1-tap booking & live van arrival alerts.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                setPawPoints((p) => p + 100);
+                alert("🎉 +100 Bonus Paw Points added! Your new balance is " + (pawPoints + 100) + " pts. App shortcut is ready.");
+                setShowPwaBanner(false);
+              }}
+              className="rounded-full bg-teal px-4 py-2 text-xs font-bold text-white shadow-sm hover:scale-105 transition"
+            >
+              Claim +100 Pts
+            </button>
+            <button
+              onClick={() => setShowPwaBanner(false)}
+              className="rounded-full p-2 text-xs text-muted-foreground hover:bg-muted"
+              aria-label="Dismiss banner"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Navigation Tabs */}
       <div className="mb-8 flex gap-2 overflow-x-auto border-b border-border pb-2">
         {[
           { id: "overview", label: "My Dog & Live Tracker", icon: Heart },
           { id: "book", label: "Book Direct Appointment", icon: Calendar },
           { id: "vaccines", label: "Vaccine Reminders", icon: ShieldCheck, badge: "Action Needed" },
+          { id: "rewards", label: "Paw Points & Rewards", icon: Gift, badge: `${pawPoints} Pts` },
+          { id: "matting", label: "Coat Care & Matting Risk", icon: Scissors },
           { id: "history", label: "Grooming History & Reports", icon: FileText },
           { id: "vip", label: "VIP Subscription", icon: Crown },
         ].map((tab) => {
@@ -852,6 +985,306 @@ export function PortalSurface() {
             >
               Pause or Skip Next Cycle
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: PAW POINTS & LOYALTY REWARDS */}
+      {activeTab === "rewards" && (
+        <div className="card-surface p-6 md:p-8 max-w-4xl mx-auto shadow-lift border border-border space-y-8 animate-fade-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+            <div>
+              <Pill tone="gold" className="mb-2"><Gift className="h-3.5 w-3.5 fill-current" /> Fresh Pooch Loyalty Club</Pill>
+              <h2 className="font-serif text-2xl md:text-3xl font-semibold text-ink">
+                {pet.name}'s Paw Points Balance
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Earn 1 Point per $1 CAD spent. Redeem for organic treats, luxury facials, and grooming credits.
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-gradient-teal p-4 text-white text-right shadow-sm trailer-rivets">
+              <div className="text-[10px] uppercase font-bold text-gold tracking-wide">Available Balance</div>
+              <div className="font-serif text-3xl font-bold flex items-center justify-end gap-1.5">
+                <Star className="h-5 w-5 fill-gold text-gold" /> {pawPoints} Pts
+              </div>
+              <div className="text-[11px] text-white/80 mt-0.5">Silver Pup Tier (1.25x Multiplier)</div>
+            </div>
+          </div>
+
+          {redeemedReward && (
+            <div className="rounded-xl border border-success/40 bg-success-soft/60 p-4 text-xs font-semibold text-success flex items-center justify-between animate-fade-up">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>🎉 Redeemed: <strong>{redeemedReward}</strong>! This perk will be automatically applied on your next scheduled visit.</span>
+              </div>
+              <button onClick={() => setRedeemedReward(null)} className="text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+          )}
+
+          {/* Reward Catalog */}
+          <div>
+            <h3 className="font-serif text-lg font-bold text-ink mb-3 flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-gold" /> Redeemable Rewards Catalog
+            </h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {[
+                {
+                  id: "facial",
+                  title: "Organic Blueberry Facial",
+                  cost: 150,
+                  val: "$15 CAD value",
+                  desc: "Gently eliminates tear stains & conditions beard whiskers with antioxidants.",
+                },
+                {
+                  id: "salt",
+                  title: "Winter Road Salt Paw Balm & Nose Butter",
+                  cost: 250,
+                  val: "$25 CAD value",
+                  desc: "Essential for Toronto winters. Shields delicate paw pads from toxic sidewalk de-icers.",
+                },
+                {
+                  id: "addon",
+                  title: "50% Off Any Add-On Spa Treatment",
+                  cost: 400,
+                  val: "$40 CAD value",
+                  desc: "Valid on de-shedding treatments, nail filing buff, or ear flush spa therapy.",
+                },
+                {
+                  id: "free_groom",
+                  title: "100% Free Full Spa Groom Visit",
+                  cost: 750,
+                  val: "$149 CAD value",
+                  desc: "Complete head-to-paw luxury grooming package in our heated mobile van.",
+                },
+              ].map((r) => {
+                const canRedeem = pawPoints >= r.cost;
+                return (
+                  <div key={r.id} className="rounded-2xl border border-border bg-card p-4 flex flex-col justify-between shadow-sm">
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-foreground">{r.title}</span>
+                        <span className="rounded-full bg-gold/20 text-ink text-xs font-bold px-2 py-0.5">{r.cost} Pts</span>
+                      </div>
+                      <div className="text-[11px] font-semibold text-teal mt-0.5">{r.val}</div>
+                      <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{r.desc}</p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (canRedeem) {
+                          setPawPoints((p) => p - r.cost);
+                          setRedeemedReward(r.title);
+                        } else {
+                          alert(`You need ${r.cost - pawPoints} more Paw Points to unlock this perk! Keep grooming with us to earn.`);
+                        }
+                      }}
+                      disabled={!canRedeem}
+                      className={cn(
+                        "mt-4 w-full rounded-xl py-2 text-xs font-bold transition",
+                        canRedeem
+                          ? "bg-teal text-white hover:bg-teal/90 shadow-sm"
+                          : "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+                      )}
+                    >
+                      {canRedeem ? "Redeem for " + r.cost + " Pts" : "Unlock at " + r.cost + " Pts"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Referral & Birthday Row */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-border bg-secondary/50 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Share2 className="h-4 w-4 text-teal" />
+                <h4 className="font-bold text-sm text-ink">Give $20 CAD, Get 200 Pts</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Share your personal code with Toronto pet owners. They get $20 off their first groom, and you get 200 bonus Paw Points!
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value="BARNABY20"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-mono font-bold text-ink text-center"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText("BARNABY20");
+                    alert("Referral code BARNABY20 copied to clipboard!");
+                  }}
+                  className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-foreground hover:bg-muted"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-secondary/50 p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Gift className="h-4 w-4 text-gold" />
+                <h4 className="font-bold text-sm text-ink">{pet.name}'s Birthday Club</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Registered Gotcha Day: <strong>May 14</strong>. We celebrate every year with a complimentary organic pupcake and celebratory silk bandana!
+              </p>
+              <div className="rounded-xl bg-card p-2.5 text-[11px] text-teal font-semibold border border-teal/20 flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5" /> Birthday Month Perk: Automatic VIP Gift Box Included
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 7: COAT CARE & MATTING RISK ADVISOR */}
+      {activeTab === "matting" && (
+        <div className="card-surface p-6 md:p-8 max-w-4xl mx-auto shadow-lift border border-border space-y-8 animate-fade-up">
+          <div className="border-b border-border pb-4">
+            <Pill tone="teal" className="mb-2"><Scissors className="h-3.5 w-3.5" /> Interactive Health Tool</Pill>
+            <h2 className="font-serif text-2xl md:text-3xl font-semibold text-ink">
+              Toronto Canine Coat Care & Matting Advisor
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Toronto's winter road slush and summer humidity can cause tight matting close to delicate skin. Check your pup's current risk level.
+            </p>
+          </div>
+
+          {/* Coat Selector & Timeline */}
+          <div className="grid sm:grid-cols-2 gap-6">
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-2">1. Select Your Dog's Coat Type</label>
+              <div className="space-y-2">
+                {[
+                  { id: "doodle", label: "Doodle / Poodle Fleece & Wool", riskBase: "high", desc: "Highest friction risk; curls trap shed undercoat." },
+                  { id: "double", label: "Double Coat (Husky, Shepherd, Golden)", riskBase: "med", desc: "Thick undercoat requires seasonal blowout." },
+                  { id: "silky", label: "Drop / Silky Coat (Yorkie, Maltese)", riskBase: "med", desc: "Fine hairs tangle easily behind ears and harness." },
+                  { id: "smooth", label: "Smooth Coat (Frenchie, Pug, Boxer)", riskBase: "low", desc: "Low matting risk; primary focus is skin folds & bath." },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCoatType(c.id)}
+                    className={cn(
+                      "w-full text-left rounded-xl p-3 border text-xs transition",
+                      selectedCoatType === c.id
+                        ? "border-teal bg-teal/10 font-bold text-ink"
+                        : "border-border bg-card text-muted-foreground hover:bg-secondary"
+                    )}
+                  >
+                    <div className="font-semibold text-foreground">{c.label}</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">{c.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-foreground block mb-2">
+                2. Weeks Since Last Professional Groom: <span className="text-teal font-extrabold text-sm">{weeksSinceGroom} Weeks</span>
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={12}
+                value={weeksSinceGroom}
+                onChange={(e) => setWeeksSinceGroom(Number(e.target.value))}
+                className="w-full accent-teal h-2 bg-secondary rounded-lg cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-1 font-mono">
+                <span>1 wk</span>
+                <span>4 wks (Ideal)</span>
+                <span>8 wks</span>
+                <span>12 wks</span>
+              </div>
+
+              {/* Dynamic Risk Display Card */}
+              {(() => {
+                const isHighRiskCoat = selectedCoatType === "doodle" || selectedCoatType === "silky";
+                const isShortCoat = selectedCoatType === "smooth";
+
+                let riskLevel: "low" | "moderate" | "high" | "critical" = "low";
+                if (isShortCoat) {
+                  riskLevel = "low";
+                } else if (isHighRiskCoat) {
+                  if (weeksSinceGroom <= 3) riskLevel = "low";
+                  else if (weeksSinceGroom <= 5) riskLevel = "moderate";
+                  else if (weeksSinceGroom <= 7) riskLevel = "high";
+                  else riskLevel = "critical";
+                } else {
+                  if (weeksSinceGroom <= 4) riskLevel = "low";
+                  else if (weeksSinceGroom <= 7) riskLevel = "moderate";
+                  else riskLevel = "high";
+                }
+
+                return (
+                  <div className={cn(
+                    "mt-6 rounded-2xl p-5 border text-xs space-y-3",
+                    riskLevel === "low" && "border-success/40 bg-success-soft/50 text-success-800",
+                    riskLevel === "moderate" && "border-amber/40 bg-amber-soft/50 text-amber-900",
+                    riskLevel === "high" && "border-orange-500/40 bg-orange-50 text-orange-950",
+                    riskLevel === "critical" && "border-destructive/40 bg-destructive/10 text-destructive",
+                  )}>
+                    <div className="flex items-center justify-between">
+                      <span className="uppercase text-[10px] font-bold tracking-wider">Calculated Coat Status</span>
+                      <span className={cn(
+                        "rounded-full px-2.5 py-0.5 text-xs font-bold",
+                        riskLevel === "low" && "bg-success text-white",
+                        riskLevel === "moderate" && "bg-amber text-ink",
+                        riskLevel === "high" && "bg-orange-500 text-white",
+                        riskLevel === "critical" && "bg-destructive text-white",
+                      )}>
+                        {riskLevel === "low" && "🟢 Low Risk (Maintain With Daily Combing)"}
+                        {riskLevel === "moderate" && "🟡 Moderate Risk (Tangles Forming At Friction Points)"}
+                        {riskLevel === "high" && "🟠 High Risk (Dense Mats Close To Skin)"}
+                        {riskLevel === "critical" && "🔴 Critical Matting Hazard (Pelted Coat Risk)"}
+                      </span>
+                    </div>
+
+                    <p className="leading-relaxed text-xs">
+                      {riskLevel === "low" && `At ${weeksSinceGroom} weeks, ${pet.name}'s coat is in prime condition. Continue daily line-brushing with a long-pin slicker brush.`}
+                      {riskLevel === "moderate" && `Friction zones (behind ears, armpits, and under collar) are likely tangling. Use a metal greyhound comb down to the skin level.`}
+                      {riskLevel === "high" && `Mats are likely tightening near the skin surface, pulling on nerve endings. We recommend booking a gentle de-matting treatment within the next 7 days.`}
+                      {riskLevel === "critical" && `Dense pelting can trap moisture, yeast, and sidewalk salt against the skin. For ${pet.name}'s comfort and welfare, our groomer may recommend a smooth reset cut.`}
+                    </p>
+
+                    <div className="pt-2 border-t border-current/15 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold">Recommended action:</span>
+                      <button
+                        onClick={() => setActiveTab("book")}
+                        className="rounded-full bg-ink px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:scale-105 transition"
+                      >
+                        Book Mobile Visit Now →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Expert Toronto Groomer Rules */}
+          <div className="rounded-2xl bg-secondary/50 p-5 border border-border">
+            <h4 className="font-bold text-sm text-ink mb-3 flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-teal" /> Sarah's Golden Rules for Toronto Winter Coat Care
+            </h4>
+            <div className="grid sm:grid-cols-3 gap-4 text-xs text-muted-foreground">
+              <div className="space-y-1">
+                <strong className="text-foreground block">⚠️ Never Bathe a Matted Dog</strong>
+                <p>Water acts like glue on tangled undercoat, shrinking knots tighter like a boiled wool sweater. Always brush out first!</p>
+              </div>
+              <div className="space-y-1">
+                <strong className="text-foreground block">🪮 Practice Line-Brushing</strong>
+                <p>Part the hair with one hand and brush small sections from the skin outward with a slicker brush, followed by a steel comb.</p>
+              </div>
+              <div className="space-y-1">
+                <strong className="text-foreground block">🧂 Rinse Toronto Road Salt</strong>
+                <p>Calcium chloride sidewalk melt dries out pads and gets licked off by dogs. Always wipe paws or request our organic paw balm.</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
