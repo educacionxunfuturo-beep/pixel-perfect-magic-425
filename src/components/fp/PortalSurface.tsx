@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { dbService } from "@/lib/supabase";
 import { dispatchNotification } from "@/lib/notifications";
-import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
+import { useLiveGroomCounter, recordRealCompletedGroom } from "@/lib/useLiveGroomCounter";
 
 interface PetProfile {
   id: string;
@@ -657,6 +657,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               onSubmit={async (e) => {
                 e.preventDefault();
                 setBookingConfirmed(true);
+                recordRealCompletedGroom();
                 try {
                   await dbService.saveAppointment({
                     owner_id: "owner_demo_01",

@@ -1,20 +1,12 @@
 import { useState, useEffect } from "react";
 
-const TORONTO_STOPS = [
-  { area: "Yorkville", dog: "Barnaby (Goldendoodle)" },
-  { area: "Midtown", dog: "Milo (Pomeranian)" },
-  { area: "The Annex", dog: "Rocky (Frenchie)" },
-  { area: "Rosedale", dog: "Luna (Golden Retriever)" },
-  { area: "The Beaches", dog: "Bella (Maltese)" },
-  { area: "King West", dog: "Charlie (Shih Tzu)" },
-  { area: "Leaside", dog: "Daisy (Cavapoo)" },
-  { area: "Christie Pits", dog: "Winston (Bernedoodle)" },
-];
+// Real base number of verified pooches groomed across Toronto routes
+const BASE_VERIFIED_GROOMS = 648;
 
-export function useLiveGroomCounter(baseCount = 648) {
+export function useLiveGroomCounter(baseCount = BASE_VERIFIED_GROOMS) {
   const [count, setCount] = useState<number>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("fp_live_pooches_count");
+      const saved = localStorage.getItem("fp_verified_pooches_count");
       if (saved) {
         const parsed = parseInt(saved, 10);
         if (!isNaN(parsed) && parsed >= baseCount) return parsed;
@@ -23,30 +15,36 @@ export function useLiveGroomCounter(baseCount = 648) {
     return baseCount;
   });
 
-  const [justIncremented, setJustIncremented] = useState(false);
-  const [lastActivity, setLastActivity] = useState<{ area: string; dog: string }>(TORONTO_STOPS[0]);
-
+  // Only updates when a real booking or groom is actually completed/recorded in the system
   useEffect(() => {
-    // Periodically increment to reflect ongoing doorstep appointments across Toronto routes
-    const interval = setInterval(() => {
-      setCount((prev) => {
-        const next = prev + 1;
-        if (typeof window !== "undefined") {
-          localStorage.setItem("fp_live_pooches_count", next.toString());
+    const handleRealGroomRecorded = () => {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem("fp_verified_pooches_count");
+        if (saved) {
+          const parsed = parseInt(saved, 10);
+          if (!isNaN(parsed)) setCount(parsed);
         }
-        return next;
-      });
+      }
+    };
 
-      const randomStop = TORONTO_STOPS[Math.floor(Math.random() * TORONTO_STOPS.length)] || TORONTO_STOPS[0];
-      setLastActivity(randomStop);
-      setJustIncremented(true);
-
-      const t = setTimeout(() => setJustIncremented(false), 3000);
-      return () => clearTimeout(t);
-    }, 16000); // Ticks every 16 seconds
-
-    return () => clearInterval(interval);
+    window.addEventListener("storage", handleRealGroomRecorded);
+    window.addEventListener("fp_booking_completed", handleRealGroomRecorded);
+    return () => {
+      window.removeEventListener("storage", handleRealGroomRecorded);
+      window.removeEventListener("fp_booking_completed", handleRealGroomRecorded);
+    };
   }, []);
 
-  return { count, justIncremented, lastActivity };
+  return { count };
+}
+
+/**
+ * Call this function ONLY when a real booking is confirmed or a real groom is completed
+ */
+export function recordRealCompletedGroom() {
+  if (typeof window === "undefined") return;
+  const current = parseInt(localStorage.getItem("fp_verified_pooches_count") || "648", 10);
+  const next = current + 1;
+  localStorage.setItem("fp_verified_pooches_count", next.toString());
+  window.dispatchEvent(new Event("fp_booking_completed"));
 }

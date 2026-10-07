@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX, Maximize2, X, Instagram, Sparkles, MapPin, Heart } from "lucide-react";
 import { Pill, SectionTitle } from "./primitives";
 import { cn } from "@/lib/utils";
