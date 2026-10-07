@@ -1,4 +1,4 @@
-import { Globe, PawPrint, Truck, BarChart3, Lock } from "lucide-react";
+import { Globe, PawPrint, Truck, BarChart3, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "./primitives";
 
@@ -8,7 +8,7 @@ const tabs: { id: Surface; label: string; short: string; icon: typeof Globe }[] 
   { id: "public", label: "Public Web & Quote", short: "Web", icon: Globe },
   { id: "portal", label: "Customer Portal", short: "Portal", icon: PawPrint },
   { id: "groomer", label: "Groomer Field Mode", short: "Van", icon: Truck },
-  { id: "admin", label: "Staff Admin 🔒", short: "Admin 🔒", icon: Lock },
+  { id: "admin", label: "Staff Admin", short: "Admin", icon: KeyRound },
 ];
 
 export function TopNav({ surface, onChange }: { surface: Surface; onChange: (s: Surface) => void }) {

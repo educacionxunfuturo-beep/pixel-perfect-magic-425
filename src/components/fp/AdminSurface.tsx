@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   TrendingUp, CalendarDays, DollarSign, Users, Truck, Star, ArrowUpRight, ArrowDownRight, MapPin, Fuel, Wrench,
-  Lock, LogOut, ShieldCheck, Key, AlertCircle, Sparkles,
+  KeyRound, LogOut, ShieldCheck, Key, AlertCircle, Sparkles, User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
@@ -39,7 +39,7 @@ const VAN = [
   { label: "Next service", value: "Dec 12", icon: Wrench, note: "Oil + generator check" },
 ];
 
-export function AdminSurface() {
+export function AdminSurface({ onClientLogin }: { onClientLogin?: () => void }) {
   const [range, setRange] = useState<"week" | "month">("week");
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [email, setEmail] = useState("");
@@ -54,6 +54,13 @@ export function AdminSurface() {
     ) {
       setIsAuthenticated(true);
       setError("");
+    } else if (email.trim().toLowerCase().includes("@") && !email.trim().toLowerCase().includes("admin")) {
+      // If customer enters their pet parent account here, switch to client portal
+      if (onClientLogin) {
+        onClientLogin();
+      } else {
+        setError("This is a pet parent customer account. Please log in through the Customer Portal.");
+      }
     } else {
       setError("Invalid credentials. Enter admin@thefreshpooch.ca / pooch2026 or use Instant Demo Access.");
     }
@@ -74,11 +81,11 @@ export function AdminSurface() {
         <div className="card-surface overflow-hidden border border-border shadow-lift">
           <div className="bg-gradient-teal p-6 text-center text-primary-foreground trailer-rivets">
             <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-card/20 backdrop-blur border border-card/30">
-              <Lock className="h-7 w-7 text-gold" />
+              <KeyRound className="h-7 w-7 text-gold" />
             </div>
             <h2 className="font-serif text-2xl font-bold">The Fresh Pooch Operations</h2>
             <p className="mt-1 text-xs text-primary-foreground/80">
-              Restricted Staff & Fleet Management Portal
+              Staff & Fleet Management Console
             </p>
           </div>
 
@@ -86,8 +93,8 @@ export function AdminSurface() {
             <div className="rounded-xl border border-gold/40 bg-gold-soft/30 p-3 text-xs text-muted-foreground flex items-start gap-2.5">
               <Key className="h-4 w-4 shrink-0 text-gold mt-0.5" />
               <div>
-                <strong className="text-foreground">Separate Admin Credentials:</strong>
-                <p className="mt-0.5">Customer pet accounts cannot log in here. Dispatchers and fleet supervisors only.</p>
+                <strong className="text-foreground">Operations Sign-In:</strong>
+                <p className="mt-0.5">Admin & dispatchers log in here to manage vans, routes, and bookings.</p>
               </div>
             </div>
 
@@ -113,7 +120,7 @@ export function AdminSurface() {
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Master Security Key / Password
+                Security Key / Password
               </label>
               <input
                 type="password"
@@ -140,8 +147,20 @@ export function AdminSurface() {
               ⚡ One-Click Demo Admin Access
             </button>
 
+            {onClientLogin && (
+              <div className="pt-2 text-center border-t border-border">
+                <button
+                  type="button"
+                  onClick={onClientLogin}
+                  className="text-xs font-semibold text-teal hover:underline flex items-center justify-center gap-1.5 mx-auto"
+                >
+                  <User className="h-3.5 w-3.5" /> Pet Parent? Sign in to your Customer Portal →
+                </button>
+              </div>
+            )}
+
             <div className="text-center text-[11px] text-muted-foreground">
-              Demo credentials: <code className="font-mono text-foreground font-semibold">admin@thefreshpooch.ca</code> / <code className="font-mono text-foreground font-semibold">pooch2026</code>
+              Admin demo: <code className="font-mono text-foreground font-semibold">admin@thefreshpooch.ca</code> / <code className="font-mono text-foreground font-semibold">pooch2026</code>
             </div>
           </form>
         </div>

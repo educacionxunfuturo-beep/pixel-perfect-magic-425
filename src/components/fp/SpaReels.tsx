@@ -63,6 +63,23 @@ function ReelCard({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
 
+  const isBlowout = reel.id === "pomeranian-blowout";
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (isBlowout) {
+      const v = e.currentTarget;
+      if (v.currentTime >= 21 || v.currentTime < 14) {
+        v.currentTime = 14;
+      }
+    }
+  };
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (isBlowout) {
+      e.currentTarget.currentTime = 14;
+    }
+  };
+
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!videoRef.current) return;
@@ -70,6 +87,9 @@ function ReelCard({
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
+      if (isBlowout && (videoRef.current.currentTime < 14 || videoRef.current.currentTime >= 21)) {
+        videoRef.current.currentTime = 14;
+      }
       videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
@@ -81,6 +101,9 @@ function ReelCard({
     videoRef.current.muted = nextMuted;
     setIsMuted(nextMuted);
     if (!isPlaying) {
+      if (isBlowout && (videoRef.current.currentTime < 14 || videoRef.current.currentTime >= 21)) {
+        videoRef.current.currentTime = 14;
+      }
       videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
@@ -94,11 +117,13 @@ function ReelCard({
       <div className="relative aspect-[9/15] w-full overflow-hidden bg-black/40">
         <video
           ref={videoRef}
-          src={reel.videoSrc}
+          src={`${reel.videoSrc}${isBlowout ? "#t=14,21" : ""}`}
           poster={reel.posterSrc}
           playsInline
           loop
           muted={isMuted}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
           preload="metadata"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -158,6 +183,41 @@ function ReelCard({
 
 export function SpaReels() {
   const [activeModalReel, setActiveModalReel] = useState<ReelItem | null>(null);
+  const [modalMuted, setModalMuted] = useState(false);
+  const modalVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Lock background scroll when story modal is open so page doesn't shift
+  useEffect(() => {
+    if (activeModalReel) {
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [activeModalReel]);
+
+  // Handle exact 7s clip for Milo blowout (second 14 to 21)
+  useEffect(() => {
+    if (activeModalReel?.id === "pomeranian-blowout" && modalVideoRef.current) {
+      modalVideoRef.current.currentTime = 14;
+    }
+  }, [activeModalReel]);
+
+  const handleModalTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (activeModalReel?.id === "pomeranian-blowout") {
+      const v = e.currentTarget;
+      if (v.currentTime >= 21 || v.currentTime < 14) {
+        v.currentTime = 14;
+      }
+    }
+  };
+
+  const handleModalLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (activeModalReel?.id === "pomeranian-blowout") {
+      e.currentTarget.currentTime = 14;
+    }
+  };
 
   return (
     <section className="border-t border-border bg-card/40 py-16">
@@ -206,44 +266,66 @@ export function SpaReels() {
         </div>
       </div>
 
-      {/* Story / Modal Viewer */}
+      {/* Story / Modal Viewer — Viewport-Bounded & Seamless Overlay */}
       {activeModalReel && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-fade-in"
           onClick={() => setActiveModalReel(null)}
         >
+          {/* Modal Container: Height-constrained to 82vh so it NEVER overflows the screen */}
           <div
-            className="relative max-w-sm w-full overflow-hidden rounded-3xl bg-black border border-white/20 shadow-2xl"
+            className="relative flex flex-col justify-end h-[82vh] max-h-[640px] aspect-[9/16] w-auto max-w-[92vw] overflow-hidden rounded-3xl bg-black border border-white/20 shadow-2xl transition-all"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Top Close Button — Pinned and Always Visible */}
             <button
               onClick={() => setActiveModalReel(null)}
               aria-label="Close story"
-              className="absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/90 transition-colors"
+              className="absolute right-3.5 top-3.5 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur hover:bg-black/95 transition shadow-lg border border-white/20"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="relative aspect-[9/16] w-full">
-              <video
-                src={activeModalReel.videoSrc}
-                autoPlay
-                playsInline
-                loop
-                controls
-                className="h-full w-full object-cover"
-              />
-            </div>
+            {/* Top Mute / Unmute Button */}
+            <button
+              onClick={() => setModalMuted(!modalMuted)}
+              aria-label={modalMuted ? "Unmute audio" : "Mute audio"}
+              className="absolute left-3.5 top-3.5 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur hover:bg-black/95 transition shadow-lg border border-white/20"
+            >
+              {modalMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
 
-            <div className="p-4 bg-ink text-white">
-              <div className="flex items-center gap-2 mb-1">
-                <Pill tone="gold" className="text-[10px]">{activeModalReel.badge}</Pill>
-                <span className="text-xs text-white/70">{activeModalReel.tag}</span>
+            {/* Full-bleed video inside the container */}
+            <video
+              ref={modalVideoRef}
+              src={`${activeModalReel.videoSrc}${activeModalReel.id === "pomeranian-blowout" ? "#t=14,21" : ""}`}
+              poster={activeModalReel.posterSrc}
+              autoPlay
+              playsInline
+              loop
+              muted={modalMuted}
+              onTimeUpdate={handleModalTimeUpdate}
+              onLoadedMetadata={handleModalLoadedMetadata}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+
+            {/* Sleek Overlay Details at Bottom (TikTok & Instagram Reels Style) */}
+            <div className="relative z-20 p-4 sm:p-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent text-white pointer-events-none">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="rounded-full bg-gold/90 text-ink text-[10px] font-bold px-2 py-0.5 shadow-sm">
+                  {activeModalReel.badge}
+                </span>
+                <span className="text-xs text-white/80 font-semibold">{activeModalReel.tag}</span>
+                {activeModalReel.id === "pomeranian-blowout" && (
+                  <span className="rounded-full bg-white/20 text-white text-[10px] font-mono px-2 py-0.5">
+                    7s Clip (14s–21s)
+                  </span>
+                )}
               </div>
-              <h4 className="font-serif text-lg font-semibold">{activeModalReel.title}</h4>
-              <p className="mt-1 text-xs text-white/80 leading-relaxed">{activeModalReel.description}</p>
+              <h4 className="font-serif text-lg font-bold leading-tight">{activeModalReel.title}</h4>
+              <p className="mt-1 text-xs text-white/85 line-clamp-2 leading-relaxed">{activeModalReel.description}</p>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import {
   CalendarHeart, Crown, Upload, Truck, Check, Navigation, Bath, Sparkles, MapPin,
   ShieldCheck, AlertTriangle, KeyRound, Eye, EyeOff, Clock, User, Phone, Mail,
   Calendar, FileText, Plus, ChevronRight, LogOut, CheckCircle2, Heart, Award,
-  Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle
+  Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle, Camera
 } from "lucide-react";
 import barnaby from "@/assets/barnaby.jpg";
 import { cn } from "@/lib/utils";
@@ -70,10 +70,10 @@ const STAGES = [
   { label: "En Route", sub: "14 min away", icon: Navigation },
   { label: "Arrived", sub: "Parked in visitor loop", icon: Truck },
   { label: "In Tub", sub: "Organic oatmeal bath", icon: Bath },
-  { label: "Finished", sub: "Report card sent", icon: Sparkles },
+  { label: "Finished", sub: "Report card sent", icon: Camera },
 ];
 
-export function PortalSurface() {
+export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [userEmail, setUserEmail] = useState("jordan.m@torontoparents.ca");
@@ -135,6 +135,15 @@ export function PortalSurface() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
+                  if (
+                    userEmail.trim().toLowerCase() === "admin@thefreshpooch.ca" ||
+                    userEmail.trim().toLowerCase() === "hello@doggroomingtoronto.ca"
+                  ) {
+                    if (onAdminLogin) {
+                      onAdminLogin();
+                      return;
+                    }
+                  }
                   setIsAuthenticated(true);
                 }}
                 className="mt-6 space-y-4"
@@ -207,18 +216,29 @@ export function PortalSurface() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-2xl bg-secondary/70 p-4 border border-border text-center">
-              <span className="font-bold text-xs text-ink block mb-1">🐾 Instant Demo Access</span>
-              <p className="text-[11px] text-muted-foreground mb-3">
-                Want to explore the client portal right away? Click below to access Jordan & Barnaby's prefilled profile with 380 Paw Points.
+            <div className="mt-6 rounded-2xl bg-secondary/70 p-4 border border-border text-center space-y-2">
+              <span className="font-bold text-xs text-ink block">🐾 Instant One-Click Access</span>
+              <p className="text-[11px] text-muted-foreground">
+                Both pet parents and staff sign in here. Select your profile to enter immediately:
               </p>
-              <button
-                type="button"
-                onClick={() => setIsAuthenticated(true)}
-                className="w-full rounded-full bg-ink px-4 py-2.5 text-xs font-bold text-white hover:bg-ink/90 transition shadow-sm"
-              >
-                Log In As Demo Client (Jordan & Barnaby)
-              </button>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthenticated(true)}
+                  className="rounded-xl bg-teal px-3 py-2 text-xs font-bold text-white hover:bg-teal/90 transition shadow-sm"
+                >
+                  🐾 Client (Barnaby)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onAdminLogin) onAdminLogin();
+                  }}
+                  className="rounded-xl bg-ink px-3 py-2 text-xs font-bold text-white hover:bg-ink/90 transition shadow-sm"
+                >
+                  🔑 Staff Admin Demo
+                </button>
+              </div>
             </div>
           </div>
 
@@ -254,14 +274,14 @@ export function PortalSurface() {
                     desc: "Grooming while you work: lockbox or condo codes are revealed only to your certified groomer on day of service.",
                   },
                   {
+                    icon: Camera,
+                    title: "Digital Pooch Report Cards & HD Album",
+                    desc: "Receive digital transformation report cards after every visit with before/after photos, behavior scores, and coat condition notes.",
+                  },
+                  {
                     icon: Gift,
                     title: "Fresh Rewards: Paw Points Club",
                     desc: "Earn points on every dollar spent. Redeem for free blueberry facials, winter salt balms, and birthday surprises.",
-                  },
-                  {
-                    icon: Scissors,
-                    title: "Coat Matting Risk Advisor",
-                    desc: "Free diagnostic tool calculating matting danger between grooms tailored for Toronto weather.",
                   },
                   {
                     icon: Smartphone,

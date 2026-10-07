@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Smartphone, ShieldCheck, Heart, Sparkles, Gift, Clock, Award,
-  CheckCircle2, ArrowRight, Download, Star, QrCode, Lock, Zap
+  CheckCircle2, ArrowRight, Download, Star, QrCode, Lock, Zap, Camera, KeyRound
 } from "lucide-react";
 import { Pill, SectionTitle } from "./primitives";
 import barnabyImg from "@/assets/barnaby.jpg";
@@ -23,13 +23,13 @@ export function PetParentAppSection({ onOpenPortal }: { onOpenPortal?: () => voi
       badge: "Veterinary Compliant",
     },
     {
-      icon: Lock,
+      icon: KeyRound,
       title: "Encrypted Latchkey Access Manager",
       desc: "Grooming while you work: securely store lockbox or condo smart lock codes. Revealed to your bonded groomer only upon doorstep arrival.",
       badge: "100% Contactless",
     },
     {
-      icon: Sparkles,
+      icon: Camera,
       title: "Digital Pooch Report Cards & HD Album",
       desc: "Receive digital transformation report cards after every visit with before/after photos, behavior scores, and coat condition notes.",
       badge: "Photo Memory Lane",

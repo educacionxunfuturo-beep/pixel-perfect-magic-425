@@ -38,9 +38,9 @@ function Index() {
       <TopNav surface={surface} onChange={setSurface} />
       <main>
         {surface === "public" && <PublicSurface onOpenPortal={() => setSurface("portal")} />}
-        {surface === "portal" && <PortalSurface />}
+        {surface === "portal" && <PortalSurface onAdminLogin={() => setSurface("admin")} />}
         {surface === "groomer" && <GroomerSurface />}
-        {surface === "admin" && <AdminSurface />}
+        {surface === "admin" && <AdminSurface onClientLogin={() => setSurface("portal")} />}
       </main>
       <SiteFooter />
       <QimmiqAssistant />
