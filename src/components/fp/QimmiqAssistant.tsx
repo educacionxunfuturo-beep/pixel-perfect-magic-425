@@ -542,14 +542,14 @@ function generateAgentReply(
     if (day) {
       return {
         text: lang === "en"
-          ? `🚐 Our mobile spa is in **${entities.location}** on **${day.en}**.\n\nHere is the full weekly route:\n${tableEn}\n\nWe also visit East York, Etobicoke, North York, Leaside and more of the GTA. Share your postal code and I'll confirm your exact day! 🐾`
-          : `🚐 Nuestro spa móvil pasa por **${entities.location}** **${day.es}**.\n\nEsta es la ruta completa de la semana:\n${tableEs}\n\nTambién vamos a East York, Etobicoke, North York, Leaside y más zonas del GTA. Dime tu código postal y te confirmo tu día exacto. 🐾`,
+          ? `🚐 Our mobile spa is in **${entities.location}** on **${day.en}**.\n\nHere is the full weekly route:\n${tableEn}\n\nWe also visit East York, Etobicoke, North York and more of the GTA. Share your postal code and I'll confirm your exact day! 🐾`
+          : `🚐 Nuestro spa móvil pasa por **${entities.location}** **${day.es}**.\n\nEsta es la ruta completa de la semana:\n${tableEs}\n\nTambién vamos a East York, Etobicoke, North York y más zonas del GTA. Dime tu código postal y te confirmo tu día exacto. 🐾`,
       };
     }
     return {
       text: lang === "en"
-        ? `📍 **We groom across Toronto and the GTA.** Our weekly route:\n${tableEn}\n\nWe also visit East York, Etobicoke, North York, Leaside, Mississauga, Markham, Scarborough and Richmond Hill. Share your postal code and I'll confirm your day! 🐾`
-        : `📍 **Atendemos en todo Toronto y el GTA.** Esta es la ruta de la semana:\n${tableEs}\n\nTambién vamos a East York, Etobicoke, North York, Leaside, Mississauga, Markham, Scarborough y Richmond Hill. Dime tu código postal y te confirmo tu día. 🐾`,
+        ? `📍 **We groom across Toronto and the GTA.** Our weekly route:\n${tableEn}\n\nWe also visit East York, Etobicoke, North York, Mississauga, Markham, Scarborough and Richmond Hill. Share your postal code and I'll confirm your day! 🐾`
+        : `📍 **Atendemos en todo Toronto y el GTA.** Esta es la ruta de la semana:\n${tableEs}\n\nTambién vamos a East York, Etobicoke, North York, Mississauga, Markham, Scarborough y Richmond Hill. Dime tu código postal y te confirmo tu día. 🐾`,
     };
   }
 
