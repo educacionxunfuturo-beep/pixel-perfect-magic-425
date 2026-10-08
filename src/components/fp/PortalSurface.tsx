@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import barnaby from "@/assets/barnaby.jpg";
 import vanPhoto from "@/assets/gallery/gallery-van-exterior.jpg";
-import { DEMO_CLIENT_EMAIL, clientLogin, clientLogout, clientSignup, getClientAccount, type ClientAccount, type ClientProfile } from "@/lib/client-account";
+import { DEMO_CLIENT_EMAIL, clientLogin, clientLogout, clientSignup, getClientAccount, requestPasswordReset, resetPassword, saveAccess, type ClientAccount, type ClientProfile } from "@/lib/client-account";
+import { AccountVaccines } from "./AccountVaccines";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { dispatchNotification } from "@/lib/notifications";
@@ -88,12 +89,12 @@ function newPetProfile(p: ClientProfile): PetProfile {
     photo: vanPhoto,
     tags: [],
     vaccines: {
-      rabies: { exp: "Not uploaded yet", status: "warning" },
-      bordetella: { exp: "Not uploaded yet", status: "warning" },
-      dhpp: { exp: "Not uploaded yet", status: "warning" },
+      rabies: { exp: p.vaccines?.rabies?.expires ?? "Not uploaded yet", status: "warning" },
+      bordetella: { exp: p.vaccines?.bordetella?.expires ?? "Not uploaded yet", status: "warning" },
+      dhpp: { exp: p.vaccines?.dhpp?.expires ?? "Not uploaded yet", status: "warning" },
     },
-    latchkeyCode: "",
-    latchkeyNotes: "",
+    latchkeyCode: p.access?.code ?? "",
+    latchkeyNotes: p.access?.notes ?? "",
   };
 }
 
@@ -116,7 +117,9 @@ const STAGES = [
 export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const { count } = useLiveGroomCounter(648);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [authMode, setAuthMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("jordan.m@torontoparents.ca");
   const [userName, setUserName] = useState("Jordan Miller");
   const [userPhone, setUserPhone] = useState("(416) 555-0199");
@@ -171,7 +174,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
     setUserPhone(p.phone);
     setUserAddress(p.address);
     setPet(newPetProfile(p));
-    setCodeDraft("");
+    setCodeDraft(p.access?.code ?? "");
     // 1 Paw Point per dollar of completed grooms
     setPawPoints(acc.bookings.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.total, 0));
     setVipActive(false);
@@ -179,6 +182,15 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   };
 
   useEffect(() => {
+    // a password-reset link opens the portal with ?reset=<token>
+    const token = new URLSearchParams(window.location.search).get("reset");
+    if (token) {
+      setResetToken(token);
+      setAuthMode("reset");
+      setLoginPassword("");
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
     getClientAccount().then((acc) => {
       if (acc) enterWithAccount(acc);
     });
@@ -217,7 +229,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               <div className="text-center lg:text-left">
                 <Pill tone="gold" className="mb-3">Toronto Pet Parent Portal</Pill>
                 <h1 className="font-serif text-3xl font-semibold text-ink">
-                  {authMode === "login" ? "Sign In to Your Dashboard" : "Create Pet Parent Account"}
+                  {authMode === "login" ? "Sign In to Your Dashboard" : authMode === "signup" ? "Create Pet Parent Account" : authMode === "forgot" ? "Forgot your password?" : "Choose a new password"}
                 </h1>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {authMode === "login"
@@ -230,6 +242,35 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 onSubmit={async (e) => {
                   e.preventDefault();
                   setLoginError(null);
+                  setAuthNotice(null);
+                  if (authMode === "forgot") {
+                    setSigningIn(true);
+                    try {
+                      const delivery = await requestPasswordReset(userEmail);
+                      setAuthNotice(
+                        delivery === "email"
+                          ? "If this email has an account, a reset link is on its way. Check your inbox."
+                          : "Request sent. If this email has an account, The Fresh Pooch will text or WhatsApp you a reset link shortly.",
+                      );
+                    } catch (err) {
+                      setLoginError(err instanceof Error ? err.message : "Something went wrong.");
+                    } finally {
+                      setSigningIn(false);
+                    }
+                    return;
+                  }
+                  if (authMode === "reset") {
+                    setSigningIn(true);
+                    try {
+                      enterWithAccount(await resetPassword(resetToken ?? "", loginPassword));
+                      setAuthMode("login");
+                    } catch (err) {
+                      setLoginError(err instanceof Error ? err.message : "Could not reset the password.");
+                    } finally {
+                      setSigningIn(false);
+                    }
+                    return;
+                  }
                   if (looksLikeStaffEmail(userEmail)) {
                     setSigningIn(true);
                     try {
@@ -284,6 +325,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     />
                   </div>
                 )}
+                {authMode !== "reset" && (
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Email Address</label>
                   <input
@@ -295,8 +337,17 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
                   />
                 </div>
+                )}
+                {authMode !== "forgot" && (
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Password</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground">{authMode === "reset" ? "New Password (8+ characters)" : "Password"}</label>
+                    {authMode === "login" && (
+                      <button type="button" onClick={() => { setAuthMode("forgot"); setLoginError(null); setAuthNotice(null); }} className="text-[11px] font-semibold text-teal hover:underline">
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="password"
                     required
@@ -305,6 +356,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
                   />
                 </div>
+                )}
                 {authMode === "signup" && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -340,6 +392,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 )}
 
                 {loginError && <p className="text-xs font-semibold text-destructive">{loginError}</p>}
+                {authNotice && <p className="rounded-xl bg-success-soft px-3 py-2 text-xs font-semibold text-success">{authNotice}</p>}
                 {authMode === "login" && (
                   <p className="text-[11px] text-muted-foreground">
                     Just looking? The sample account <strong>{DEMO_CLIENT_EMAIL}</strong> (password <strong>demo-pass</strong>) opens a portal full of example data.
@@ -351,7 +404,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-teal py-3 text-sm font-bold text-white shadow-lift transition-transform hover:scale-[1.02]"
                 >
                   <PawPrint className="h-4 w-4" />
-                  <span>{authMode === "login" ? "Sign In to Pet Parent Portal" : "Create Account & Enter Portal"}</span>
+                  <span>{authMode === "login" ? "Sign In to Pet Parent Portal" : authMode === "signup" ? "Create Account & Enter Portal" : authMode === "forgot" ? "Send Me a Reset Link" : "Save New Password & Sign In"}</span>
                 </button>
               </form>
 
@@ -368,13 +421,16 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                       setUserAddress("");
                       setLoginPassword("");
                     }
+                    setAuthNotice(null);
                     setAuthMode(authMode === "login" ? "signup" : "login");
                   }}
                   className="text-xs font-semibold text-teal hover:underline"
                 >
                   {authMode === "login"
                     ? "Don't have an account? Sign up for free"
-                    : "Already have an account? Sign in here"}
+                    : authMode === "signup"
+                    ? "Already have an account? Sign in here"
+                    : "Back to sign in"}
                 </button>
               </div>
             </div>
@@ -642,9 +698,13 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                           className="w-24 rounded-lg border border-border bg-background px-2 py-1 text-center font-mono font-bold text-base"
                         />
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             setPet({ ...pet, latchkeyCode: codeDraft });
                             setEditingCode(false);
+                            if (account) {
+                              const acc = await saveAccess(codeDraft, pet.latchkeyNotes).catch(() => null);
+                              if (acc) setAccount(acc);
+                            }
                           }}
                           className="rounded-full bg-teal px-3 py-1 text-xs font-bold text-white"
                         >
@@ -992,11 +1052,16 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 Automatic expiry alerts complying with City of Toronto & Ontario municipal bylaws.
               </p>
             </div>
+            {!account && (
             <button className="flex items-center gap-1.5 rounded-full border border-teal/40 bg-card px-4 py-2 text-xs font-bold text-teal hover:bg-teal hover:text-white transition-colors">
               <Upload className="h-3.5 w-3.5" /> Upload Vet Certificate
             </button>
+            )}
           </div>
 
+          {account ? (
+            <AccountVaccines account={account} onSaved={(acc) => { setAccount(acc); setPet((prev) => ({ ...prev, vaccines: newPetProfile(acc.profile).vaccines })); }} />
+          ) : (
           <div className="space-y-4">
             {/* Rabies */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-success/30 bg-success-soft/50 p-4">
@@ -1050,6 +1115,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               <Pill tone="teal">Up To Date</Pill>
             </div>
           </div>
+          )}
         </div>
       )}
 

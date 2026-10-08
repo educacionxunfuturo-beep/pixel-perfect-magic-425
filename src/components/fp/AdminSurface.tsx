@@ -6,8 +6,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
 import { AdminTools } from "./AdminTools";
+import { AdminResets } from "./AdminResets";
 import { GOOGLE_RATING } from "./PublicSections";
-import { formatDate, serviceName, torontoToday, updateAppointment, useAppointments } from "@/lib/appointments";
+import { formatDate, serviceName, torontoToday, updateAppointment, useAppointments, type Appointment } from "@/lib/appointments";
 import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "@/lib/dashboard-stats";
 import { getStaffConfig, looksLikeStaffEmail, staffDemoLogin, staffLogin, staffLogout, type StaffConfig } from "@/lib/staff-session";
 
@@ -16,6 +17,26 @@ const SAMPLE_VIP_MEMBERS = { value: "54", delta: "+8 this month" };
 
 const money = (n: number) => `$${n.toLocaleString("en-CA")}`;
 const changeLabel = (pct: number | null) => (pct === null ? "new" : `${pct >= 0 ? "+" : ""}${pct}% vs last month`);
+
+const VACCINE_LABELS = [["rabies", "Rabies"], ["bordetella", "Bordetella"], ["dhpp", "DHPP"]] as const;
+
+/** Vaccine status on the visit date, from the pet parent's account; certificates open for staff. */
+function VaccineLine({ vaccines, date }: { vaccines: NonNullable<Appointment["vaccines"]>; date: string }) {
+  return (
+    <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px]">
+      {VACCINE_LABELS.map(([kind, label]) => {
+        const v = vaccines[kind];
+        const ok = v && v.expires >= date;
+        const text = `${label} ${v ? (ok ? "✓" : "expired") : "missing"}`;
+        return v?.docId ? (
+          <a key={kind} href={`/api/vaccine-docs/${v.docId}`} target="_blank" rel="noreferrer" className={cn("underline", ok ? "text-success" : "text-destructive")} title={`Valid until ${v.expires}`}>{text}</a>
+        ) : (
+          <span key={kind} className={ok ? "text-success" : "text-destructive"} title={v ? `Valid until ${v.expires}` : "Not on file"}>{text}</span>
+        );
+      })}
+    </div>
+  );
+}
 
 const VAN = [
   { label: "Fuel level", value: "72%", icon: Fuel, note: "Next fill-up Friday" },
@@ -391,7 +412,11 @@ export function AdminSurface({
                 {upcoming.map((a) => (
                   <tr key={a.id} className="border-t border-border">
                     <td className="py-2.5 font-semibold">{formatDate(a.date)}<div className="text-xs font-normal text-muted-foreground">{a.timeWindow ?? a.time}</div></td>
-                    <td>{a.petName}<div className="text-xs text-muted-foreground">{a.breed}</div></td>
+                    <td>
+                      {a.petName}
+                      <div className="text-xs text-muted-foreground">{a.breed}</div>
+                      {a.vaccines && <VaccineLine vaccines={a.vaccines} date={a.date} />}
+                    </td>
                     <td>{serviceName(a.service)}</td>
                     <td className="max-w-[200px] truncate text-muted-foreground">{a.address}</td>
                     <td className="text-right font-semibold">${a.total}</td>
@@ -412,6 +437,8 @@ export function AdminSurface({
           </div>
         )}
       </div>
+
+      <AdminResets />
 
       <div className="mt-6">
         <SectionTitle eyebrow="Route Density" title="Zone coverage this month" sub="Where the trailer parks, and how full each route day is." />

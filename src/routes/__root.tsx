@@ -84,7 +84,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-title", content: "The Fresh Pooch" },
     ],
     links: [
-      { rel: "manifest", href: "/manifest.json" },
+      { rel: "manifest", href: "/manifest.json?v=2" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -95,9 +95,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/official-logo.png", type: "image/png" },
-      { rel: "apple-touch-icon", href: "/official-logo.png" },
-      { rel: "shortcut icon", href: "/favicon.png", type: "image/png" },
+      // Transparent logo icons (no white square); iPhones always show an opaque tile, so theirs is on white.
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,

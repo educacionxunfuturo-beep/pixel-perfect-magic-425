@@ -1,9 +1,11 @@
 // The Fresh Pooch PWA Service Worker
-const CACHE_NAME = "fresh-pooch-v1";
+const CACHE_NAME = "fresh-pooch-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/favicon.ico",
-  "/manifest.json"
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {

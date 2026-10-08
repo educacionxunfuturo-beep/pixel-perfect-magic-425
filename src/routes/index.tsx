@@ -39,6 +39,8 @@ function Index() {
   // A staff session survives page reloads through its HttpOnly cookie.
   useEffect(() => {
     getStaffSession().then((s) => setIsAdminAuthenticated(s.authenticated));
+    // password-reset links (/?reset=...) open the pet-parent portal
+    if (new URLSearchParams(window.location.search).has("reset")) setSurface("portal");
   }, []);
 
   const handleNavChange = (s: Surface) => {

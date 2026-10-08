@@ -52,6 +52,8 @@ export interface Appointment {
   createdAt: string;
   completedAt?: string;
   report?: ReportCard;
+  /** Vaccine expiry dates (and certificate ids) from the pet parent's account, when booked signed in. */
+  vaccines?: Partial<Record<"rabies" | "bordetella" | "dhpp", { expires: string; docId?: string }>>;
 }
 
 export type NewAppointment = Omit<Appointment, "id" | "reference" | "createdAt" | "total" | "status"> & {

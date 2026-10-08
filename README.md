@@ -35,8 +35,9 @@ Server settings live on the Cloudflare Worker, never in the browser bundle (see 
 | `DEMO_STAFF_ACCESS`, `DEMO_STAFF_HINT` | var | Public demo only: one-click demo sign-in and the hint shown on the sign-in screen. Remove both for real use. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | secret / var | Real SMS sending. Without them the app says the SMS was not sent. |
 | `GEMINI_API_KEY` | secret | Live Qimmiq answers and the AI owner copilot. Without it Qimmiq uses its built-in engine. |
-| `BOOKINGS_DB` | D1 binding | Shared bookings and pet-parent accounts. Create the tables with the files in `migrations/` (`npx wrangler d1 execute thefreshpooch-bookings --remote --file migrations/0001_bookings.sql`, then `0002`). |
+| `BOOKINGS_DB` | D1 binding | Shared bookings and pet-parent accounts. Create the tables with the files in `migrations/` (`npx wrangler d1 execute thefreshpooch-bookings --remote --file migrations/0001_bookings.sql`, then `0002` and `0003`). |
 | `NTFY_TOPIC` | secret | Push alert to the owner's phone (free ntfy app) for each new booking request: dog, service, date and price only. |
+| `RESEND_API_KEY` + `RESET_EMAIL_FROM` | secret + var | Optional: password-reset links are emailed (Resend). Without them, the owner sends the one-time link from the dashboard ("Password help"). |
 
 Set secrets with `npx wrangler secret put NAME --name thefreshpooch`; vars live in `wrangler.json`.
 

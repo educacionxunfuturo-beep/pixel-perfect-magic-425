@@ -14,6 +14,8 @@ import { buildCopilotPrompt, buildQimmiqPrompt, type QimmiqContext } from "./qim
  *   GEMINI_MODELS       var     optional comma-separated model list, tried in order
  *   BOOKINGS_DB         D1      shared bookings (portal, quote and Qimmiq cart) so staff see them on any device
  *   NTFY_TOPIC          secret  optional; push alert to the owner's phone (ntfy app) for each new booking
+ *   RESEND_API_KEY      secret  optional; with RESET_EMAIL_FROM (var), password-reset links are emailed
+ *                               (otherwise the owner sends them from the dashboard)
  * Pet-parent accounts live in the same D1 database (table customers); see migrations/.
  */
 
@@ -291,7 +293,7 @@ function bookingsDb(rawEnv: unknown): D1Like | null {
 }
 
 const BOOKING_STATUSES = ["requested", "confirmed", "en_route", "in_progress", "completed", "cancelled"];
-type BookingFields = "id" | "date" | "service" | "source" | "status" | "total" | "weightLbs" | "reference" | "petName" | "breed" | "time" | "address" | "timeWindow" | "postalCode" | "ownerName" | "ownerPhone" | "latchkeyCode" | "notes" | "waiver" | "paymentMethod" | "createdAt" | "completedAt" | "report";
+type BookingFields = "id" | "date" | "service" | "source" | "status" | "total" | "weightLbs" | "reference" | "petName" | "breed" | "time" | "address" | "timeWindow" | "postalCode" | "ownerName" | "ownerPhone" | "latchkeyCode" | "notes" | "waiver" | "paymentMethod" | "createdAt" | "completedAt" | "report" | "vaccines";
 type BookingRecord = { [K in BookingFields]?: unknown };
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
@@ -336,6 +338,18 @@ async function createBooking(request: Request, rawEnv: unknown): Promise<Respons
   const now = new Date().toISOString();
   // INSERT OR IGNORE: a request can never overwrite an existing booking
   const customerEmail = await readSignedCookie(request, readEnv(rawEnv), "client", CLIENT_COOKIE);
+  if (customerEmail) {
+    // the account's saved access code and vaccine records travel with the booking, for the groomer
+    const row = await db.prepare("SELECT data FROM customers WHERE email = ?").bind(customerEmail).first<{ data: string }>();
+    const profile = row ? (JSON.parse(row.data) as CustomerProfile) : null;
+    if (profile?.access?.code && !booking.latchkeyCode) booking.latchkeyCode = profile.access.code;
+    if (profile?.access?.notes && !booking.notes) booking.notes = profile.access.notes;
+    if (profile?.vaccines) {
+      booking.vaccines = Object.fromEntries(
+        Object.entries(profile.vaccines).map(([kind, v]) => [kind, { expires: v.expires, ...(v.docId ? { docId: v.docId } : {}) }]),
+      );
+    }
+  }
   const result = (await db
     .prepare("INSERT OR IGNORE INTO bookings (id, date, data, created_at, updated_at, customer_email) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(booking.id, booking.date, JSON.stringify(booking), now, now, customerEmail)
@@ -398,6 +412,9 @@ const CLIENT_COOKIE = "fp_client";
 const CLIENT_SECONDS = 30 * 24 * 60 * 60;
 const PBKDF2_ITERATIONS = 100_000; // the Workers runtime maximum
 
+type VaccineKind = "rabies" | "bordetella" | "dhpp";
+const VACCINE_KINDS: VaccineKind[] = ["rabies", "bordetella", "dhpp"];
+
 interface CustomerProfile {
   name: string;
   email: string;
@@ -405,6 +422,10 @@ interface CustomerProfile {
   address: string;
   pet: { name: string; breed: string; weightLbs: number };
   createdAt: string;
+  /** Lockbox / door code and access notes, copied onto each booking for the groomer. */
+  access?: { code: string; notes: string };
+  /** Expiry date (YYYY-MM-DD) and certificate of each core vaccine. */
+  vaccines?: Partial<Record<VaccineKind, { expires: string; docId?: string; fileName?: string; uploadedAt: string }>>;
 }
 
 async function hashPassword(password: string, saltB64?: string): Promise<{ hash: string; salt: string }> {
@@ -465,6 +486,182 @@ async function clientLogin(request: Request, env: Env, rawEnv: unknown): Promise
   return accountResponse(db, JSON.parse(row.data) as CustomerProfile, cookie ? { "set-cookie": cookie } : {});
 }
 
+/** The signed-in pet parent's email and stored profile, or null. */
+async function signedInCustomer(request: Request, env: Env, db: D1Like): Promise<CustomerProfile | null> {
+  const email = await readSignedCookie(request, env, "client", CLIENT_COOKIE);
+  if (!email) return null;
+  const row = await db.prepare("SELECT data FROM customers WHERE email = ?").bind(email).first<{ data: string }>();
+  return row ? (JSON.parse(row.data) as CustomerProfile) : null;
+}
+
+async function saveProfile(db: D1Like, profile: CustomerProfile) {
+  await db.prepare("UPDATE customers SET data = ? WHERE email = ?").bind(JSON.stringify(profile), profile.email).run();
+}
+
+async function updateAccess(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  const profile = db && (await signedInCustomer(request, env, db));
+  if (!db || !profile) return json({ error: "Please sign in again." }, 401);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { code?: string; notes?: string };
+  profile.access = { code: String(body.code ?? "").trim().slice(0, 20), notes: String(body.notes ?? "").trim().slice(0, 300) };
+  await saveProfile(db, profile);
+  return accountResponse(db, profile);
+}
+
+const DOC_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf"];
+const MAX_DOC_BYTES = 1_400_000; // D1 rows hold up to 2 MB; base64 adds a third
+
+async function saveVaccine(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  const profile = db && (await signedInCustomer(request, env, db));
+  if (!db || !profile) return json({ error: "Please sign in again." }, 401);
+  if (rateLimited(`vaccine:${profile.email}`, 20, 60 * 60 * 1000)) return json({ error: "Too many uploads. Try again later." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { kind?: string; expires?: string; fileName?: string; contentType?: string; data?: string };
+  const kind = body.kind as VaccineKind;
+  const expires = String(body.expires ?? "");
+  if (!VACCINE_KINDS.includes(kind)) return json({ error: "Unknown vaccine." }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expires)) return json({ error: "Please enter the expiry date shown on the certificate." }, 400);
+  const entry: NonNullable<CustomerProfile["vaccines"]>[VaccineKind] = { ...profile.vaccines?.[kind], expires, uploadedAt: new Date().toISOString() };
+  if (body.data) {
+    const contentType = String(body.contentType ?? "");
+    if (!DOC_TYPES.includes(contentType)) return json({ error: "Upload a photo (JPG, PNG, HEIC) or a PDF of the certificate." }, 400);
+    const data = String(body.data);
+    if (data.length * 0.75 > MAX_DOC_BYTES) return json({ error: "That file is too large. Please upload a photo or PDF under 1.4 MB." }, 413);
+    const docId = `doc-${crypto.randomUUID()}`;
+    const fileName = String(body.fileName ?? "certificate").slice(0, 80);
+    await db
+      .prepare("INSERT INTO vaccine_docs (id, email, kind, file_name, content_type, data, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(docId, profile.email, kind, fileName, contentType, data, entry.uploadedAt)
+      .run();
+    if (entry.docId) await db.prepare("DELETE FROM vaccine_docs WHERE id = ? AND email = ?").bind(entry.docId, profile.email).run();
+    entry.docId = docId;
+    entry.fileName = fileName;
+  }
+  profile.vaccines = { ...profile.vaccines, [kind]: entry };
+  await saveProfile(db, profile);
+  return accountResponse(db, profile);
+}
+
+/** A vaccine certificate: for the pet parent who uploaded it, or for staff. */
+async function vaccineDoc(request: Request, env: Env, rawEnv: unknown, id: string): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Not found" }, 404);
+  const row = await db.prepare("SELECT email, file_name, content_type, data FROM vaccine_docs WHERE id = ?").bind(id).first<{ email: string; file_name: string; content_type: string; data: string }>();
+  const clientEmail = await readSignedCookie(request, env, "client", CLIENT_COOKIE);
+  const staff = await readStaffSession(request, rawEnv);
+  if (!row || (!staff && clientEmail !== row.email)) return json({ error: "Not found" }, 404);
+  const bytes = Uint8Array.from(atob(row.data), (c) => c.charCodeAt(0));
+  return new Response(bytes, {
+    headers: {
+      "content-type": row.content_type,
+      "content-disposition": `inline; filename="${row.file_name.replace(/[^\w.\- ]/g, "_")}"`,
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+// ---------- password reset ----------
+// With RESEND_API_KEY + RESET_EMAIL_FROM the link is emailed. Without them, the owner gets an alert and
+// sends a one-time link from the dashboard (WhatsApp or text), after checking who is asking.
+
+const RESET_SECONDS = 24 * 60 * 60;
+
+async function createResetLink(db: D1Like, request: Request, email: string): Promise<string> {
+  const token = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  await db
+    .prepare("INSERT INTO password_resets (token_hash, email, expires_at, used, created_at) VALUES (?, ?, ?, 0, ?)")
+    .bind(b64url(await sha256(token)), email, Math.floor(Date.now() / 1000) + RESET_SECONDS, new Date().toISOString())
+    .run();
+  return new URL(`/?reset=${token}`, request.url).toString();
+}
+
+async function forgotPassword(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Accounts are not available on this server." }, 503);
+  if (rateLimited(`forgot:${clientIp(request)}`, 5, 60 * 60 * 1000)) return json({ error: "Too many requests. Try again later." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { email?: string };
+  const email = String(body.email ?? "").trim().toLowerCase().slice(0, 120);
+  const row = email ? await db.prepare("SELECT data FROM customers WHERE email = ?").bind(email).first<{ data: string }>() : null;
+  const emailService = Boolean(env["RESEND_API_KEY"] && env["RESET_EMAIL_FROM"]);
+  if (row) {
+    const profile = JSON.parse(row.data) as CustomerProfile;
+    if (emailService) {
+      const link = await createResetLink(db, request, email);
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { authorization: `Bearer ${env["RESEND_API_KEY"]}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          from: env["RESET_EMAIL_FROM"],
+          to: email,
+          subject: "Reset your The Fresh Pooch password",
+          text: `Hi ${profile.name},\n\nUse this link within 24 hours to choose a new password:\n${link}\n\nIf you did not ask for this, ignore this email.\n\nThe Fresh Pooch`,
+        }),
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => undefined);
+    } else {
+      await db.prepare("INSERT OR REPLACE INTO reset_requests (email, requested_at, handled) VALUES (?, ?, 0)").bind(email, new Date().toISOString()).run();
+      const topic = env["NTFY_TOPIC"];
+      if (topic) {
+        await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+          method: "POST",
+          headers: { Title: "Password reset request", Tags: "key", Click: new URL("/", request.url).toString() },
+          body: `${profile.name} asked to reset their password. Send them a reset link from the owner dashboard.`,
+          signal: AbortSignal.timeout(3_000),
+        }).catch(() => undefined);
+      }
+    }
+  }
+  // same answer whether or not the account exists
+  return json({ ok: true, delivery: emailService ? "email" : "owner" });
+}
+
+async function resetPassword(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Accounts are not available on this server." }, 503);
+  if (rateLimited(`reset:${clientIp(request)}`, 10, 60 * 60 * 1000)) return json({ error: "Too many attempts. Try again later." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { token?: string; password?: string };
+  const password = String(body.password ?? "");
+  if (password.length < 8 || password.length > 200) return json({ error: "Use a password of at least 8 characters." }, 400);
+  const tokenHash = b64url(await sha256(String(body.token ?? "")));
+  const reset = await db.prepare("SELECT email, expires_at, used FROM password_resets WHERE token_hash = ?").bind(tokenHash).first<{ email: string; expires_at: number; used: number }>();
+  if (!reset || reset.used || reset.expires_at < Date.now() / 1000) return json({ error: "This reset link has expired or was already used. Ask for a new one." }, 400);
+  const row = await db.prepare("SELECT data FROM customers WHERE email = ?").bind(reset.email).first<{ data: string }>();
+  if (!row) return json({ error: "This reset link has expired or was already used. Ask for a new one." }, 400);
+  const { hash, salt } = await hashPassword(password);
+  await db.prepare("UPDATE customers SET password_hash = ?, salt = ? WHERE email = ?").bind(hash, salt, reset.email).run();
+  await db.prepare("UPDATE password_resets SET used = 1 WHERE token_hash = ?").bind(tokenHash).run();
+  const cookie = await signedCookie(env, "client", CLIENT_COOKIE, reset.email, CLIENT_SECONDS, request);
+  return accountResponse(db, JSON.parse(row.data) as CustomerProfile, cookie ? { "set-cookie": cookie } : {});
+}
+
+/** Staff: pending reset requests, and a one-time link to send to the pet parent. */
+async function staffResets(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ requests: [] });
+  if (!(await readStaffSession(request, rawEnv))) return json({ error: "Staff sign-in required." }, 401);
+  if (request.method === "GET") {
+    const { results } = await db
+      .prepare("SELECT r.email, r.requested_at, c.data FROM reset_requests r JOIN customers c ON c.email = r.email WHERE r.handled = 0 ORDER BY r.requested_at DESC LIMIT ?")
+      .bind(50)
+      .all<{ email: string; requested_at: string; data: string }>();
+    return json({
+      requests: results.map((r) => {
+        const p = JSON.parse(r.data) as CustomerProfile;
+        return { email: r.email, name: p.name, phone: p.phone, petName: p.pet.name, requestedAt: r.requested_at };
+      }),
+    });
+  }
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { email?: string };
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const row = await db.prepare("SELECT data FROM customers WHERE email = ?").bind(email).first<{ data: string }>();
+  if (!row) return json({ error: "No account with that email." }, 404);
+  const link = await createResetLink(db, request, email);
+  await db.prepare("UPDATE reset_requests SET handled = 1 WHERE email = ?").bind(email).run();
+  const p = JSON.parse(row.data) as CustomerProfile;
+  return json({ link, name: p.name, phone: p.phone });
+}
+
 async function currentAccount(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
   const db = bookingsDb(rawEnv);
   const email = await readSignedCookie(request, env, "client", CLIENT_COOKIE);
@@ -502,6 +699,13 @@ export async function handleApi(request: Request, rawEnv: unknown): Promise<Resp
   if (pathname === "/api/account/login" && method === "POST") return clientLogin(request, env, rawEnv);
   if (pathname === "/api/account" && method === "GET") return currentAccount(request, env, rawEnv);
   if (pathname === "/api/account/logout" && method === "POST") return json({ ok: true }, 200, { "set-cookie": `${CLIENT_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
+  if (pathname === "/api/account/access" && method === "POST") return updateAccess(request, env, rawEnv);
+  if (pathname === "/api/account/vaccines" && method === "POST") return saveVaccine(request, env, rawEnv);
+  if (pathname === "/api/account/forgot" && method === "POST") return forgotPassword(request, env, rawEnv);
+  if (pathname === "/api/account/reset" && method === "POST") return resetPassword(request, env, rawEnv);
+  if (pathname === "/api/staff/password-resets" && (method === "GET" || method === "POST")) return staffResets(request, env, rawEnv);
+  const docPath = /^\/api\/vaccine-docs\/(doc-[0-9a-f-]{36})$/.exec(pathname);
+  if (docPath && method === "GET") return vaccineDoc(request, env, rawEnv, docPath[1]!);
   if (pathname === "/api/bookings" && method === "POST") return createBooking(request, rawEnv);
   if (pathname === "/api/bookings" && method === "GET") return listBookings(request, rawEnv);
   const bookingPath = /^\/api\/bookings\/(appt-[a-z0-9-]+)$/i.exec(pathname);
