@@ -408,6 +408,8 @@ async function apiCreate(input: NewAppointment): Promise<Appointment> {
       customerPhone: input.ownerPhone || "+16474511747",
       customerEmail: "bookings@thefreshpooch.ca",
       acceptedCancellationPolicy: true,
+      // The backend defaults to an 18% tip; tips are chosen after the groom, not at booking.
+      tipPercentage: 0,
     }),
   });
   saveApiExtras(created.id, {
