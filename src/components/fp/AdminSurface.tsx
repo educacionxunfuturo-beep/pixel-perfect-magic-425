@@ -242,13 +242,13 @@ export function AdminSurface({
         })}
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr]">
         <div className="card-surface p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold">Bookings & revenue</h2>
             <Pill tone="gold"><TrendingUp className="h-3.5 w-3.5" /> Best day: Saturday</Pill>
           </div>
-          <div className="mt-6 flex h-48 items-end gap-3">
+          <div className="mt-6 flex h-48 items-stretch gap-3">
             {WEEK.map((d) => (
               <div key={d.day} className="flex flex-1 flex-col items-center gap-2">
                 <div className="flex w-full flex-1 items-end">

@@ -119,7 +119,11 @@ export const api = {
 
   // 9. Calendar Feed & MoeGo Migration
   calendar: {
-    getFeedUrl: () => `${API_BASE}/calendar/feed.ics`,
+    // Without a configured backend, the web app serves a demo feed itself (src/lib/demo-calendar.ts).
+    getFeedUrl: () =>
+      (import.meta as any).env?.VITE_API_URL
+        ? `${API_BASE}/calendar/feed.ics`
+        : `${typeof window !== 'undefined' ? window.location.origin : ''}/calendar/feed.ics`,
   },
   migration: {
     importMoeGo: (rows: any[]) =>

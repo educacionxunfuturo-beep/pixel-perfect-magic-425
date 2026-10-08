@@ -53,7 +53,7 @@ export function PetParentAppSection({ onOpenPortal }: { onOpenPortal?: () => voi
   return (
     <section id="portal-benefits" className="border-t border-border bg-gradient-to-b from-secondary/40 via-card to-secondary/30 py-16 scroll-mt-20">
       <div className="mx-auto max-w-7xl px-4 md:px-6">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
           {/* Left Column: Story & Advantages */}
           <div>
             <Pill tone="gold" className="mb-4 inline-flex items-center gap-1.5 shadow-sm">
