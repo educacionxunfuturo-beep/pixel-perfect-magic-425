@@ -3,7 +3,7 @@ import { X, Send, ShoppingCart, Check, CreditCard, Trash2, ArrowRight, Cpu, Exte
 import { cn } from "@/lib/utils";
 import qimmiqAvatar from "@/assets/qimmiq-avatar.jpg";
 import { createAppointment, torontoToday, addDays, useAppointments, type Appointment } from "@/lib/appointments";
-import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/pricing";
+import { ADDONS, SERVICE_IDS, SERVICES, priceRange, quote, type ServiceId } from "@/lib/pricing";
 import {
   bathOnlyReply, bestServiceReply, bookingReply, copilotReply, differenceReply, discountReply, menuReply, priceTableReply, quoteReply, serviceRequestReply,
 } from "@/lib/qimmiq-replies";
@@ -56,6 +56,22 @@ interface ExtractedEntities {
   location?: string;
   isBathOnly?: boolean;
   isFullGroom?: boolean;
+}
+
+const TIER_OF_ENTITY = { small: "s", medium: "m", large: "l", giant: "g" } as const;
+
+/** Price an AI-suggested cart card from the shared price list (exact when breed and size are known). */
+function officialCardPrice(item: CartItem, entities: ExtractedEntities): CartItem {
+  if (item.category === "addon") {
+    const addon = ADDONS.find((a) => item.name.toLowerCase().includes(a.label.toLowerCase().split(" ").slice(-2).join(" ")));
+    return addon ? { ...item, price: addon.price } : item;
+  }
+  const name = item.name.toLowerCase();
+  const service: ServiceId | undefined = /ultimate/.test(name) ? "ultimate" : /bath|tidy/.test(name) ? "tidy" : /groom|cut|full/.test(name) ? "full" : undefined;
+  if (!service) return item;
+  const tier = entities.breedTier ? TIER_OF_ENTITY[entities.breedTier] : undefined;
+  const price = tier && entities.breed ? quote({ service, tier, breed: entities.breed }).base : priceRange(service, tier)[0];
+  return { ...item, price };
 }
 
 /** Current message wins; anything it doesn't mention is remembered from earlier turns. */
@@ -306,10 +322,14 @@ async function callGeminiLive(
     const candidate = data?.text;
     if (!candidate) return null;
 
-    let rawText = candidate;
+    // The chat renders bold/italic/code; turn AI list markers and headings into plain bullets and bold lines.
+    let rawText = candidate
+      .replace(/^[ \t]*[*-][ \t]+/gm, "• ")
+      .replace(/^#{1,6}[ \t]*(.+)$/gm, "**$1**");
     let actionItems: CartItem[] | undefined = undefined;
 
-    const jsonMatch = rawText.match(/```json\s*(\{[\s\S]*?\})\s*```/i);
+    // The cart JSON goes at the end of the answer. Hide it from the chat even when it arrives cut off.
+    const jsonMatch = rawText.match(/```json\s*([\s\S]*?)\s*(?:```|$)/i);
     if (jsonMatch) {
       try {
         const parsed = JSON.parse(jsonMatch[1] ?? "{}");
@@ -318,11 +338,14 @@ async function callGeminiLive(
         } else if (Array.isArray(parsed.recommended)) {
           actionItems = parsed.recommended;
         }
-        rawText = rawText.replace(jsonMatch[0], "").trim();
       } catch {
-        // ignore parse error
+        // incomplete JSON: no cards for this answer
       }
+      rawText = rawText.slice(0, jsonMatch.index).trim();
     }
+
+    // Never trust prices written by the AI: package and add-on cards get the official price.
+    if (actionItems) actionItems = actionItems.map((item) => officialCardPrice(item, entities));
 
     return { text: rawText, ...(actionItems ? { actionItems } : {}) };
   } catch (err) {

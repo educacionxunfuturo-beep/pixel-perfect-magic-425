@@ -10,7 +10,8 @@ import { buildQimmiqPrompt, type QimmiqContext } from "./qimmiq-prompt";
  *   DEMO_STAFF_ACCESS   var     "true" on the public demo: enables one-click demo sign-in
  *   DEMO_STAFF_HINT     var     text shown on the sign-in screen in demo mode, e.g. the demo credentials
  *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN (secrets), TWILIO_FROM (var)   real SMS sending
- *   GEMINI_API_KEY      secret  live Qimmiq answers through Google Gemini
+ *   GEMINI_API_KEY      secret  live Qimmiq answers through Google Gemini (AI Studio key)
+ *   GEMINI_MODELS       var     optional comma-separated model list, tried in order
  */
 
 type Env = Record<string, string | undefined>;
@@ -18,7 +19,8 @@ type Env = Record<string, string | undefined>;
 const SESSION_COOKIE = "fp_staff";
 const SESSION_SECONDS = 8 * 60 * 60;
 const DEFAULT_STAFF_EMAILS = "admin@thefreshpooch.ca,hello@doggroomingtoronto.ca";
-const GEMINI_MODEL = "gemini-2.0-flash";
+// gemini-2.0-flash and 2.5-flash are no longer available to new keys (Oct 2026). Override with GEMINI_MODELS.
+const DEFAULT_GEMINI_MODELS = "gemini-3.5-flash,gemini-3.8-flash,gemini-flash-lite-latest";
 
 function readEnv(env: unknown): Env {
   const fromWorker = (env && typeof env === "object" ? env : {}) as Env;
@@ -188,20 +190,35 @@ async function qimmiq(request: Request, env: Env): Promise<Response> {
     ...(typeof ctx.location === "string" ? { location: ctx.location.slice(0, 60) } : {}),
   };
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: buildQimmiqPrompt(context) }] },
-      contents: [...history, { role: "user", parts: [{ text: query }] }],
-      generationConfig: { temperature: 0.6, maxOutputTokens: 900 },
-    }),
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: buildQimmiqPrompt(context) }] },
+    contents: [...history, { role: "user", parts: [{ text: query }] }],
+    generationConfig: { temperature: 0.6, maxOutputTokens: 4096 }, // room for the model's thinking tokens
   });
-  if (!res.ok) return json({ error: "AI provider error." }, 502);
-  const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  if (!text) return json({ error: "Empty AI answer." }, 502);
-  return json({ text });
+
+  // Google retires and overloads models often: try them in order, each with a time limit,
+  // and give up after ~20 s so the browser falls back to the built-in engine.
+  const models = (env["GEMINI_MODELS"] || DEFAULT_GEMINI_MODELS).split(",").map((m) => m.trim()).filter(Boolean);
+  const started = Date.now();
+  for (const model of models) {
+    const remaining = 20_000 - (Date.now() - started);
+    if (remaining < 2_000) break;
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+        body: payload,
+        signal: AbortSignal.timeout(Math.min(9_000, remaining)),
+      });
+      if (!res.ok) continue;
+      const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+      const text = data.candidates?.[0]?.content?.parts?.filter((p) => !p.thought).map((p) => p.text ?? "").join("") ?? "";
+      if (text) return json({ text, model });
+    } catch {
+      // timeout or network error: try the next model
+    }
+  }
+  return json({ error: "AI provider unavailable." }, 502);
 }
 
 // ---------- router ----------

@@ -1,5 +1,5 @@
 import { ROUTE_DAYS } from "./appointments";
-import { ADDONS, SERVICES, SERVICE_IDS, WEIGHT_TIERS, WELCOME_CODE, formatRange, priceRange } from "./pricing";
+import { ADDONS, QUOTE_BREEDS, SERVICES, SERVICE_IDS, WEIGHT_TIERS, WELCOME_CODE, formatRange, priceRange, quote, type WeightTierId } from "./pricing";
 
 /**
  * System prompt for Qimmiq when a Gemini key is configured on the server.
@@ -20,6 +20,30 @@ function priceLines(): string {
   }).join("\n");
 }
 
+// Usual size of each quote-wizard breed, used for the exact breed price table.
+const TYPICAL_TIER: Record<string, WeightTierId> = {
+  Goldendoodle: "m", Maltese: "s", "French Bulldog": "m", "Golden Retriever": "l", "Shih Tzu": "s",
+  Bernedoodle: "g", "Labrador Retriever": "l", "Cavalier King Charles": "s", "Standard Poodle": "l", "Siberian Husky": "l",
+};
+const TIER_FROM_CONTEXT: Record<string, WeightTierId> = { small: "s", medium: "m", large: "l", giant: "g" };
+
+function breedLines(): string {
+  return QUOTE_BREEDS.map((b) => {
+    const tier = TYPICAL_TIER[b.name] ?? "m";
+    const label = WEIGHT_TIERS.find((t) => t.id === tier)!.label.toLowerCase();
+    const prices = SERVICE_IDS.map((id) => `${SERVICES[id].name} $${quote({ service: id, tier, breed: b.name }).base}`).join(", ");
+    return `  - ${b.name} (usually ${label}): ${prices}.`;
+  }).join("\n");
+}
+
+function exactQuoteLine(ctx: QimmiqContext): string {
+  const tier = ctx.breedTier ? TIER_FROM_CONTEXT[ctx.breedTier] : undefined;
+  const breed = ctx.breed;
+  if (!breed || !tier) return "";
+  const prices = SERVICE_IDS.map((id) => `${SERVICES[id].name} $${quote({ service: id, tier, breed }).base}`).join(", ");
+  return `\n- EXACT prices for this client's dog (${ctx.breed}, normal coat): ${prices}. Use these numbers as the price.`;
+}
+
 export function buildQimmiqPrompt(ctx: QimmiqContext): string {
   const breedInfo = ctx.breed ? `Known pet breed: ${ctx.breed} (${ctx.breedTier || "medium"} tier)` : "Breed: not specified yet";
   const locInfo = ctx.location ? `Known Toronto neighbourhood: ${ctx.location}` : "Location: Toronto general";
@@ -32,6 +56,8 @@ BRAND FACTS (only quote these numbers; never invent prices, dates or policies):
 - Every appointment is a 1-on-1 session inside our mobile spa van parked at the client's driveway or curbside. No cages, no cage dryers.
 - Services and CAD prices by dog size (exact price depends on breed coat, matting and add-ons):
 ${priceLines()}
+- Exact prices for common breeds (normal coat). When the breed is listed, use its price:
+${breedLines()}${exactQuoteLine(ctx)}
   Bath & Tidy does NOT include a body haircut. Premium Full Groom adds a full breed haircut and hand-scissor styling. The Ultimate Spa adds an intensive de-shedding blowout, blueberry facial and paw balm.
 - Matting surcharge: light +$20, severe +$45. Second dog from the same household: -$20.
 - Add-ons: ${addons}.
@@ -41,6 +67,8 @@ ${priceLines()}
 - Weekly route: ${routes}. We also serve East York, Etobicoke, North York, Mississauga, Markham, Scarborough and Richmond Hill on request.
 - Payment: Apple Pay, Google Pay, Interac e-Transfer, Visa, Mastercard, American Express.
 - Vaccines required: Rabies (Ontario law), DHPP and Bordetella.
+- Nervous, senior or reactive dogs: Fear-Free handling, calm breaks whenever the dog needs them, gentle hand drying at low speed, and a quiet 1-on-1 space with no other dogs. A session takes 60 to 90 minutes.
+- Do not describe equipment, products, techniques, staff or guarantees that are not listed here; if asked, say the groomer can confirm on the day.
 
 CONVERSATION RULES:
 1. Reply in the language the user writes in.
@@ -49,7 +77,7 @@ CONVERSATION RULES:
 4. Context: ${breedInfo}. ${locInfo}.
 
 ACTIONABLE CART ITEMS:
-When you recommend specific services, append at the VERY END of your message a JSON block exactly like this, using prices from the list above:
+When you recommend specific services, append at the VERY END of your message a JSON block exactly like this, using the exact prices above (the website re-checks card prices against the official list):
 \`\`\`json
 { "actionItems": [ { "id": "bath-tidy-rec", "name": "Bath & Tidy", "price": 145, "category": "package", "icon": "🛁", "badge": "No Haircut", "highlights": "Warm hydrobath, hand fluff dry, ear & nail care" } ] }
 \`\`\`
