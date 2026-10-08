@@ -7,7 +7,6 @@ export type Surface = "public" | "portal" | "groomer" | "admin";
 const tabs: { id: Surface; label: string; short: string; icon: typeof Globe }[] = [
   { id: "public", label: "Public Web & Quote", short: "Web", icon: Globe },
   { id: "portal", label: "Customer Portal", short: "Portal", icon: PawPrint },
-  { id: "groomer", label: "Groomer Field Mode", short: "Van", icon: Truck },
 ];
 
 export function TopNav({ surface, onChange }: { surface: Surface; onChange: (s: Surface) => void }) {

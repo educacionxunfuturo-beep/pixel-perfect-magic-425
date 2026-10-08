@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   TrendingUp, CalendarDays, DollarSign, Users, Truck, Star, ArrowUpRight, ArrowDownRight, MapPin, Fuel, Wrench,
-  KeyRound, LogOut, ShieldCheck, Key, AlertCircle, Sparkles, User,
+  KeyRound, LogOut, ShieldCheck, Key, AlertCircle, User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
@@ -42,10 +42,12 @@ const VAN = [
 export function AdminSurface({
   onClientLogin,
   onAuthChange,
+  onViewGroomer,
   initialAuthenticated = true,
 }: {
   onClientLogin?: () => void;
   onAuthChange?: (isAuth: boolean) => void;
+  onViewGroomer?: () => void;
   initialAuthenticated?: boolean;
 }) {
   const [range, setRange] = useState<"week" | "month">("week");
@@ -153,8 +155,7 @@ export function AdminSurface({
               onClick={handleDemoLogin}
               className="w-full rounded-xl border border-gold bg-gold-soft/40 py-2.5 text-xs font-bold text-ink transition hover:bg-gold/20 flex items-center justify-center gap-1.5"
             >
-              <Sparkles className="h-3.5 w-3.5 text-gold" />
-              ⚡ One-Click Demo Admin Access
+              <span>⚡ One-Click Demo Admin Access</span>
             </button>
 
             {onClientLogin && (
@@ -188,16 +189,27 @@ export function AdminSurface({
           <span className="text-muted-foreground">Logged in as Operations Director (<code className="font-mono">admin@thefreshpooch.ca</code>)</span>
           <Pill tone="success" className="ml-1 text-[10px]">Open 7 Days Active</Pill>
         </div>
-        <button
-          onClick={() => {
-            setIsAuthenticated(false);
-            onAuthChange?.(false);
-            if (onClientLogin) onClientLogin();
-          }}
-          className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition"
-        >
-          <LogOut className="h-3.5 w-3.5" /> Lock / Sign Out
-        </button>
+        <div className="flex items-center gap-2">
+          {onViewGroomer && (
+            <button
+              onClick={onViewGroomer}
+              className="flex items-center gap-1.5 rounded-lg border border-teal/40 bg-card px-3 py-1.5 text-xs font-semibold text-teal hover:bg-teal hover:text-white transition shadow-sm"
+              title="Supervise Groomer Sarah's Mobile Van Field App"
+            >
+              <Truck className="h-3.5 w-3.5" /> Van #1 Groomer Field App (Sarah)
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setIsAuthenticated(false);
+              onAuthChange?.(false);
+              if (onClientLogin) onClientLogin();
+            }}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Lock / Sign Out
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">

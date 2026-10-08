@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Crown, Sparkles, Shield, CalendarCheck, Heart, Zap, ArrowRight } from "lucide-react";
+import { Check, Crown, Gift, Shield, CalendarCheck, Heart, Zap, ArrowRight } from "lucide-react";
 import { Pill, SectionTitle } from "./primitives";
 import { cn } from "@/lib/utils";
 
@@ -107,7 +107,7 @@ export function SubscriptionSection({ onJoin }: { onJoin?: (planId: string) => v
               desc: "Zero anxiety. Your dog builds a loving bond with the same gentle professional.",
             },
             {
-              icon: Sparkles,
+              icon: Gift,
               title: "Free Luxury Perks",
               desc: "Complimentary Blueberry Facial and Toronto Winter Salt Paw Balm on every cycle.",
             },
@@ -143,7 +143,7 @@ export function SubscriptionSection({ onJoin }: { onJoin?: (planId: string) => v
                 {plan.popular && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                     <Pill tone="gold" className="shadow-md text-xs font-bold px-3 py-1">
-                      <Sparkles className="h-3 w-3 fill-current" /> Most Popular Choice
+                      <Crown className="h-3 w-3 fill-current" /> Most Popular Choice
                     </Pill>
                   </div>
                 )}

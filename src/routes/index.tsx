@@ -7,6 +7,7 @@ import { GroomerSurface } from "@/components/fp/GroomerSurface";
 import { SiteFooter } from "@/components/fp/PublicSections";
 import { QimmiqAssistant } from "@/components/fp/QimmiqAssistant";
 import { AdminSurface } from "@/components/fp/AdminSurface";
+import { PromoModal } from "@/components/fp/PromoModal";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -55,10 +56,11 @@ function Index() {
             }}
           />
         )}
-        {surface === "groomer" && <GroomerSurface />}
+        {surface === "groomer" && <GroomerSurface onBackToAdmin={() => setSurface("admin")} />}
         {surface === "admin" && (
           <AdminSurface
             initialAuthenticated={true}
+            onViewGroomer={() => setSurface("groomer")}
             onClientLogin={() => {
               setIsAdminAuthenticated(false);
               setSurface("portal");
@@ -69,6 +71,7 @@ function Index() {
       </main>
       <SiteFooter />
       <QimmiqAssistant isAdmin={surface === "admin" && isAdminAuthenticated} />
+      <PromoModal onOpenPortal={() => handleNavChange("portal")} />
     </div>
   );
 }

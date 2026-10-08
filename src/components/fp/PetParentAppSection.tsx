@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Smartphone, ShieldCheck, Heart, Sparkles, Gift, Clock, Award,
+  Smartphone, ShieldCheck, Heart, Gift, Clock, Award,
   CheckCircle2, ArrowRight, Download, Star, QrCode, Lock, Zap, Camera, KeyRound
 } from "lucide-react";
 import { Pill, SectionTitle } from "./primitives";

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize2, X, Instagram, Sparkles, MapPin, Heart } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Play, Pause, Volume2, VolumeX, Maximize2, X, Instagram, MapPin, Heart } from "lucide-react";
 import { Pill, SectionTitle } from "./primitives";
-import { cn } from "@/lib/utils";
 
 interface ReelItem {
   id: string;
@@ -63,33 +63,13 @@ function ReelCard({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
 
-  const isBlowout = reel.id === "pomeranian-blowout";
-
-  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    if (isBlowout) {
-      const v = e.currentTarget;
-      if (v.currentTime >= 21 || v.currentTime < 14) {
-        v.currentTime = 14;
-      }
-    }
-  };
-
-  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    if (isBlowout) {
-      e.currentTarget.currentTime = 14;
-    }
-  };
-
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const togglePlay = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      if (isBlowout && (videoRef.current.currentTime < 14 || videoRef.current.currentTime >= 21)) {
-        videoRef.current.currentTime = 14;
-      }
       videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
@@ -101,54 +81,63 @@ function ReelCard({
     videoRef.current.muted = nextMuted;
     setIsMuted(nextMuted);
     if (!isPlaying) {
-      if (isBlowout && (videoRef.current.currentTime < 14 || videoRef.current.currentTime >= 21)) {
-        videoRef.current.currentTime = 14;
-      }
       videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
 
+  const handleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isPlaying && videoRef.current) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    }
+    onOpenModal(reel);
+  };
+
   return (
     <div
-      onClick={() => onOpenModal(reel)}
+      onClick={() => togglePlay()}
       className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border bg-card shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
     >
       {/* 9:16 Video Container */}
       <div className="relative aspect-[9/15] w-full overflow-hidden bg-black/40">
         <video
           ref={videoRef}
-          src={`${reel.videoSrc}${isBlowout ? "#t=14,21" : ""}`}
+          src={reel.videoSrc}
           poster={reel.posterSrc}
           playsInline
           loop
           muted={isMuted}
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
           preload="metadata"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
 
-        {/* Top Badges */}
-        <div className="absolute left-3 right-3 top-3 flex items-center justify-between pointer-events-none">
-          <Pill tone="gold" className="bg-card/90 backdrop-blur text-[11px] font-bold">
-            <Sparkles className="h-3 w-3 text-gold" /> {reel.badge}
+        {/* Top Badges & Fullscreen Trigger */}
+        <div className="absolute left-3 right-3 top-3 flex items-center justify-between z-10">
+          <Pill tone="gold" className="bg-card/90 backdrop-blur text-[11px] font-bold pointer-events-none">
+            {reel.badge}
           </Pill>
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white/90 backdrop-blur">
-            <Maximize2 className="h-3.5 w-3.5" />
-          </span>
+          <button
+            type="button"
+            onClick={handleExpand}
+            title="Expand story fullscreen"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/90 backdrop-blur hover:bg-black/90 transition shadow-sm"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Center Play Overlay when paused */}
         {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity">
-            <div className="flex h-13 w-13 items-center justify-center rounded-full bg-card/90 text-teal shadow-lift backdrop-blur transition-transform group-hover:scale-110">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/25 transition-opacity">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-card/90 text-teal shadow-lift backdrop-blur transition-transform group-hover:scale-110">
               <Play className="ml-0.5 h-6 w-6 fill-current text-teal" />
             </div>
           </div>
         )}
 
         {/* Bottom Video Controls and Details */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 text-white">
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-4 text-white z-10">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-gold flex items-center gap-1">
               <Heart className="h-3 w-3 fill-current" /> {reel.tag}
@@ -158,7 +147,7 @@ function ReelCard({
                 type="button"
                 onClick={togglePlay}
                 aria-label={isPlaying ? "Pause video" : "Play video"}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur hover:bg-white/40 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-white backdrop-blur hover:bg-white/45 transition-colors"
               >
                 {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5 fill-current" />}
               </button>
@@ -166,7 +155,7 @@ function ReelCard({
                 type="button"
                 onClick={toggleMute}
                 aria-label={isMuted ? "Unmute audio" : "Mute audio"}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur hover:bg-white/40 transition-colors"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-white backdrop-blur hover:bg-white/45 transition-colors"
               >
                 {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
               </button>
@@ -183,12 +172,18 @@ function ReelCard({
 
 export function SpaReels() {
   const [activeModalReel, setActiveModalReel] = useState<ReelItem | null>(null);
-  const [modalMuted, setModalMuted] = useState(false);
+  const [modalMuted, setModalMuted] = useState(true);
+  const [modalPlaying, setModalPlaying] = useState(true);
   const modalVideoRef = useRef<HTMLVideoElement>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Lock background scroll when story modal is open so page doesn't shift
   useEffect(() => {
-    if (activeModalReel) {
+    setMounted(true);
+  }, []);
+
+  // Lock background scroll when story modal is open
+  useEffect(() => {
+    if (activeModalReel && typeof document !== "undefined") {
       const prevOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
@@ -197,26 +192,29 @@ export function SpaReels() {
     }
   }, [activeModalReel]);
 
-  // Handle exact 7s clip for Milo blowout (second 14 to 21)
   useEffect(() => {
-    if (activeModalReel?.id === "pomeranian-blowout" && modalVideoRef.current) {
-      modalVideoRef.current.currentTime = 14;
+    if (activeModalReel && modalVideoRef.current) {
+      modalVideoRef.current.play().then(() => setModalPlaying(true)).catch(() => {});
     }
   }, [activeModalReel]);
 
-  const handleModalTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    if (activeModalReel?.id === "pomeranian-blowout") {
-      const v = e.currentTarget;
-      if (v.currentTime >= 21 || v.currentTime < 14) {
-        v.currentTime = 14;
-      }
+  const toggleModalPlay = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!modalVideoRef.current) return;
+    if (modalPlaying) {
+      modalVideoRef.current.pause();
+      setModalPlaying(false);
+    } else {
+      modalVideoRef.current.play().then(() => setModalPlaying(true)).catch(() => {});
     }
   };
 
-  const handleModalLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    if (activeModalReel?.id === "pomeranian-blowout") {
-      e.currentTarget.currentTime = 14;
-    }
+  const toggleModalMute = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!modalVideoRef.current) return;
+    const next = !modalMuted;
+    modalVideoRef.current.muted = next;
+    setModalMuted(next);
   };
 
   return (
@@ -266,53 +264,76 @@ export function SpaReels() {
         </div>
       </div>
 
-      {/* Story / Modal Viewer — Viewport-Bounded & Seamless Overlay */}
-      {activeModalReel && (
+      {/* Story / Modal Viewer — Mounted directly into document.body via Portal to escape transforms */}
+      {mounted && activeModalReel && typeof document !== "undefined" && createPortal(
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in"
           onClick={() => setActiveModalReel(null)}
         >
-          {/* Modal Container: Height-constrained to 82vh so it NEVER overflows the screen */}
+          {/* Modal Container: Height-constrained to 84vh and 100% centered in viewport */}
           <div
-            className="relative flex flex-col justify-end h-[82vh] max-h-[640px] aspect-[9/16] w-auto max-w-[92vw] overflow-hidden rounded-3xl bg-black border border-white/20 shadow-2xl transition-all"
-            onClick={(e) => e.stopPropagation()}
+            className="relative flex flex-col justify-end h-[84vh] max-h-[680px] aspect-[9/16] w-auto max-w-[94vw] overflow-hidden rounded-3xl bg-black border border-white/20 shadow-2xl transition-all cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleModalPlay();
+            }}
           >
-            {/* Top Close Button — Pinned and Always Visible */}
+            {/* Top Close Button — Always Visible and Pinned */}
             <button
-              onClick={() => setActiveModalReel(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveModalReel(null);
+              }}
               aria-label="Close story"
-              className="absolute right-3.5 top-3.5 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur hover:bg-black/95 transition shadow-lg border border-white/20"
+              className="absolute right-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur hover:bg-black/95 transition shadow-lg border border-white/20"
             >
               <X className="h-5 w-5" />
             </button>
 
             {/* Top Mute / Unmute Button */}
             <button
-              onClick={() => setModalMuted(!modalMuted)}
+              onClick={toggleModalMute}
               aria-label={modalMuted ? "Unmute audio" : "Mute audio"}
-              className="absolute left-3.5 top-3.5 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur hover:bg-black/95 transition shadow-lg border border-white/20"
+              className="absolute left-4 top-4 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur hover:bg-black/95 transition shadow-lg border border-white/20"
             >
-              {modalMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              {modalMuted ? <VolumeX className="h-5 w-5 text-amber" /> : <Volume2 className="h-5 w-5 text-white" />}
             </button>
+
+            {/* Muted audio prompt banner if currently muted */}
+            {modalMuted && (
+              <div
+                onClick={toggleModalMute}
+                className="absolute top-16 left-4 z-40 inline-flex items-center gap-1.5 rounded-full bg-amber/90 px-3 py-1 text-xs font-bold text-ink shadow-lg animate-pulse"
+              >
+                <Volume2 className="h-3.5 w-3.5" /> Tap for sound
+              </div>
+            )}
+
+            {/* Center Play Overlay when paused */}
+            {!modalPlaying && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-teal shadow-2xl">
+                  <Play className="ml-1 h-8 w-8 fill-current text-teal" />
+                </div>
+              </div>
+            )}
 
             {/* Full-bleed video inside the container */}
             <video
               ref={modalVideoRef}
-              src={`${activeModalReel.videoSrc}${activeModalReel.id === "pomeranian-blowout" ? "#t=14,21" : ""}`}
+              src={activeModalReel.videoSrc}
               poster={activeModalReel.posterSrc}
               autoPlay
               playsInline
               loop
               muted={modalMuted}
-              onTimeUpdate={handleModalTimeUpdate}
-              onLoadedMetadata={handleModalLoadedMetadata}
               className="absolute inset-0 h-full w-full object-cover"
             />
 
-            {/* Sleek Overlay Details at Bottom (TikTok & Instagram Reels Style) */}
-            <div className="relative z-20 p-4 sm:p-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent text-white pointer-events-none">
+            {/* Sleek Overlay Details at Bottom */}
+            <div className="relative z-20 p-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent text-white pointer-events-none">
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="rounded-full bg-gold/90 text-ink text-[10px] font-bold px-2 py-0.5 shadow-sm">
                   {activeModalReel.badge}
@@ -320,7 +341,7 @@ export function SpaReels() {
                 <span className="text-xs text-white/80 font-semibold">{activeModalReel.tag}</span>
                 {activeModalReel.id === "pomeranian-blowout" && (
                   <span className="rounded-full bg-white/20 text-white text-[10px] font-mono px-2 py-0.5">
-                    7s Clip (14s–21s)
+                    7s Clip
                   </span>
                 )}
               </div>
@@ -328,7 +349,8 @@ export function SpaReels() {
               <p className="mt-1 text-xs text-white/85 line-clamp-2 leading-relaxed">{activeModalReel.description}</p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </section>
   );

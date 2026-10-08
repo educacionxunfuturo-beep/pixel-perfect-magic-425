@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  CalendarHeart, Crown, Upload, Truck, Check, Navigation, Bath, Sparkles, MapPin,
+  CalendarHeart, Crown, Upload, Truck, Check, Navigation, Bath, MapPin,
   ShieldCheck, AlertTriangle, KeyRound, Eye, EyeOff, Clock, User, Phone, Mail,
   Calendar, FileText, Plus, ChevronRight, LogOut, CheckCircle2, Heart, Award,
   Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle, Camera, PawPrint
@@ -215,22 +215,6 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   {authMode === "login"
                     ? "Don't have an account? Sign up for free"
                     : "Already have an account? Sign in here"}
-                </button>
-              </div>
-
-              {/* Discreet staff key access at the bottom */}
-              <div className="mt-6 border-t border-border/80 pt-4 flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserEmail("admin@thefreshpooch.ca");
-                    if (onAdminLogin) onAdminLogin();
-                  }}
-                  className="group inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/50 px-3.5 py-1.5 text-[11px] font-semibold text-muted-foreground transition hover:border-gold/50 hover:bg-gold-soft/20 hover:text-foreground"
-                  title="Staff & Operations Management Console"
-                >
-                  <KeyRound className="h-3.5 w-3.5 text-gold transition-transform group-hover:scale-110" />
-                  <span>Staff & Fleet Operations Access</span>
                 </button>
               </div>
             </div>

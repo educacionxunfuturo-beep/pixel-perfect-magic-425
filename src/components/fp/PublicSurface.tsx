@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Check, ChevronLeft, ChevronRight, Search, MapPin, Star, ShieldCheck, Leaf, Heart, Ban, Info, Clock, Sparkles,
+  Check, ChevronLeft, ChevronRight, Search, MapPin, Star, ShieldCheck, Leaf, Heart, Ban, Info, Clock,
 } from "lucide-react";
 import hero from "@/assets/hero-trailer.jpg";
 import beforeImg from "@/assets/before.jpg";
@@ -351,7 +351,7 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
     <div className="animate-fade-up">
       <section className="mx-auto grid max-w-7xl gap-10 px-4 py-10 md:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
         <div className="flex flex-col justify-center">
-          <Pill tone="gold" className="mb-5 self-start"><Sparkles className="h-3.5 w-3.5" /> Now booking Midtown • Annex • Rosedale</Pill>
+          <Pill tone="gold" className="mb-5 self-start">Now booking Midtown • Annex • Rosedale</Pill>
           <h1 className="text-4xl font-semibold leading-[1.05] text-ink md:text-6xl">
             Toronto's Premier Mobile Dog Spa <em className="font-normal text-teal">Right At Your Doorstep</em>
           </h1>

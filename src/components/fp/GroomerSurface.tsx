@@ -20,7 +20,7 @@ const REPORT: { key: string; label: string; opts: string[] }[] = [
   { key: "temp", label: "Temperament", opts: ["Happy Angel ⭐", "A bit wiggly", "Nervous"] },
 ];
 
-export function GroomerSurface() {
+export function GroomerSurface({ onBackToAdmin }: { onBackToAdmin?: () => void }) {
   const [active, setActive] = useState(2);
   const [reveal, setReveal] = useState(false);
   const [report, setReport] = useState<Record<string, string>>({ coat: "Silky", ears: "Clean & Fresh", nails: "Clipped & Buffed" });
@@ -50,13 +50,21 @@ export function GroomerSurface() {
       toPhone: stop.phone,
       clientName: stop.pet + "'s Family",
       dogName: stop.pet,
-      reportCardUrl: "https://educacionxunfuturo-beep-pixel-perfect-magic-425.valetdemo.workers.dev",
+      reportCardUrl: typeof window !== "undefined" ? window.location.origin : "https://thefreshpooch.valetdemo.workers.dev",
     });
     setNotifyResult(res);
   };
 
   return (
     <div className="animate-fade-up mx-auto max-w-7xl px-4 py-8 md:px-6">
+      {onBackToAdmin && (
+        <button
+          onClick={onBackToAdmin}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-4 py-2 text-xs font-bold text-teal hover:bg-secondary transition shadow-sm"
+        >
+          ← Back to Operations Admin Dashboard
+        </button>
+      )}
       <div className="bg-gradient-teal trailer-rivets mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-6 py-5 text-primary-foreground">
         <div>
           <div className="eyebrow text-gold">Van #1 • Groomer Sarah</div>
