@@ -6,7 +6,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
 import { AdminTools } from "./AdminTools";
-import { formatDate, serviceName, torontoToday, useAppointments } from "@/lib/appointments";
+import { formatDate, serviceName, torontoToday, updateAppointment, useAppointments } from "@/lib/appointments";
 import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "@/lib/dashboard-stats";
 import { getStaffConfig, looksLikeStaffEmail, staffDemoLogin, staffLogin, staffLogout, type StaffConfig } from "@/lib/staff-session";
 
@@ -320,7 +320,7 @@ export function AdminSurface({
       <div className="card-surface mt-6 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-2xl font-semibold">Upcoming bookings</h2>
-          <Pill tone="muted">From the portal and the online quote</Pill>
+          <Pill tone="muted">From the portal, the online quote and Qimmiq · any device</Pill>
         </div>
         {upcoming.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No new bookings yet. Bookings made in the Customer Portal or the instant quote appear here.</p>
@@ -338,7 +338,16 @@ export function AdminSurface({
                     <td>{serviceName(a.service)}</td>
                     <td className="max-w-[200px] truncate text-muted-foreground">{a.address}</td>
                     <td className="text-right font-semibold">${a.total}</td>
-                    <td className="text-right"><Pill tone={a.status === "requested" ? "gold" : "success"}>{a.status === "requested" ? "To confirm" : "Confirmed"}</Pill></td>
+                    <td className="text-right">
+                      {a.status === "requested" ? (
+                        <span className="inline-flex gap-1.5">
+                          <button onClick={() => updateAppointment(a.id, { status: "confirmed" })} className="rounded-full bg-gold px-3 py-1 text-xs font-bold text-ink hover:opacity-90">Confirm</button>
+                          <button onClick={() => updateAppointment(a.id, { status: "cancelled" })} className="rounded-full border border-border px-3 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground">Decline</button>
+                        </span>
+                      ) : (
+                        <Pill tone="success">Confirmed</Pill>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

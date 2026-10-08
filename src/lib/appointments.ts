@@ -424,6 +424,42 @@ async function apiCreate(input: NewAppointment): Promise<Appointment> {
   return fromApi(created);
 }
 
+// ---------- shared bookings (/api/bookings, Cloudflare D1) ----------
+// Without the NestJS backend, bookings from the portal, the quote and the Qimmiq cart are also
+// sent to the Worker so staff see them on any device. Only a signed-in staff session can read them.
+
+let sharedAccess = false;
+
+async function shareBooking(appt: Appointment) {
+  try {
+    await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(appt) });
+  } catch {
+    // offline or no shared store: the booking stays on this device
+  }
+}
+
+async function fetchSharedBookings(): Promise<Appointment[]> {
+  try {
+    const res = await fetch("/api/bookings", { credentials: "same-origin" });
+    sharedAccess = res.ok;
+    if (!res.ok) return [];
+    const data = (await res.json()) as { bookings?: Appointment[] };
+    return data.bookings ?? [];
+  } catch {
+    sharedAccess = false;
+    return [];
+  }
+}
+
+/** Shared copies win: staff may have confirmed or completed them on another device. */
+function mergeShared(local: Appointment[], shared: Appointment[]): Appointment[] {
+  if (!shared.length) return local;
+  const byId = new Map(shared.map((a) => [a.id, a]));
+  const merged = local.map((a) => (byId.has(a.id) ? { ...a, ...byId.get(a.id)! } : a));
+  const known = new Set(local.map((a) => a.id));
+  return [...merged, ...shared.filter((a) => !known.has(a.id))];
+}
+
 // ---------- public API ----------
 
 export const isUsingBackend = Boolean(API_BASE);
@@ -433,7 +469,8 @@ export async function listAppointments(): Promise<Appointment[]> {
     const list = await apiJson<ApiAppointment[]>("/booking/appointments");
     return sortByTime(list.map(fromApi));
   }
-  return sortByTime(loadLocal().appointments);
+  const shared = await fetchSharedBookings();
+  return sortByTime(mergeShared(loadLocal().appointments, shared));
 }
 
 export async function createAppointment(input: NewAppointment): Promise<Appointment> {
@@ -445,7 +482,7 @@ export async function createAppointment(input: NewAppointment): Promise<Appointm
   const store = loadLocal();
   const appt: Appointment = {
     ...input,
-    id: `appt-${Date.now().toString(36)}`,
+    id: `appt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
     reference: newReference(input.date),
     total: input.total ?? priceFor(input.service, input.breed, input.weightLbs),
     status: input.status ?? "confirmed",
@@ -453,6 +490,7 @@ export async function createAppointment(input: NewAppointment): Promise<Appointm
   };
   store.appointments.push(appt);
   writeLocal(store);
+  if (appt.source === "portal" || appt.source === "web") await shareBooking(appt);
   return appt;
 }
 
@@ -468,6 +506,14 @@ export async function updateAppointment(id: string, patch: Partial<Pick<Appointm
     if (Object.keys(extras).length) saveApiExtras(id, extras);
     window.dispatchEvent(new Event(CHANGED_EVENT));
     return;
+  }
+  if (sharedAccess) {
+    try {
+      // 404 for route stops that only live on this device
+      await fetch(`/api/bookings/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    } catch {
+      // keep the local update
+    }
   }
   const store = loadLocal();
   store.appointments = store.appointments.map((a) => (a.id === id ? { ...a, ...patch } : a));
@@ -495,7 +541,12 @@ export function useAppointments() {
     const onStorage = (e: StorageEvent) => e.key === STORE_KEY && reload();
     window.addEventListener(CHANGED_EVENT, reload);
     window.addEventListener("storage", onStorage);
+    // staff screens pick up bookings made on other devices
+    const poll = window.setInterval(() => {
+      if (sharedAccess && document.visibilityState === "visible") reload();
+    }, 20_000);
     return () => {
+      window.clearInterval(poll);
       window.removeEventListener(CHANGED_EVENT, reload);
       window.removeEventListener("storage", onStorage);
     };

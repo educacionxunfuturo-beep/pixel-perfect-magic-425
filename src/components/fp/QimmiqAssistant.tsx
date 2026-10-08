@@ -3,6 +3,7 @@ import { X, Send, ShoppingCart, Check, CreditCard, Trash2, ArrowRight, Cpu, Exte
 import { cn } from "@/lib/utils";
 import qimmiqAvatar from "@/assets/qimmiq-avatar.jpg";
 import { createAppointment, torontoToday, addDays, useAppointments, type Appointment } from "@/lib/appointments";
+import { buildOpsSnapshot } from "@/lib/copilot-snapshot";
 import { ADDONS, SERVICE_IDS, SERVICES, priceRange, quote, type ServiceId } from "@/lib/pricing";
 import {
   bathOnlyReply, bestServiceReply, bookingReply, copilotReply, differenceReply, discountReply, menuReply, priceTableReply, quoteReply, serviceRequestReply,
@@ -350,6 +351,33 @@ async function callGeminiLive(
     return { text: rawText, ...(actionItems ? { actionItems } : {}) };
   } catch (err) {
     console.warn("Gemini Live API error, falling back to local engine:", err);
+    return null;
+  }
+}
+
+/** Owner copilot through the server (staff session required); business data goes without codes, phones or addresses. */
+async function callCopilotLive(query: string, history: Msg[], appointments: Appointment[]): Promise<string | null> {
+  try {
+    const res = await fetch("/api/qimmiq/copilot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        // earlier answers listing Latchkey codes stay out of the AI request
+        history: history.filter((m) => !/latchkey|lockbox/i.test(m.text)).slice(-6).map((m) => ({ from: m.from, text: m.text })),
+        snapshot: buildOpsSnapshot(appointments),
+      }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { text?: string };
+    if (!data.text) return null;
+    return data.text
+      .replace(/```[\s\S]*?(?:```|$)/g, "")
+      .replace(/^[ \t]*[*-][ \t]+/gm, "• ")
+      .replace(/^#{1,6}[ \t]*(.+)$/gm, "**$1**")
+      .trim() || null;
+  } catch (err) {
+    console.warn("Copilot AI error, falling back to local engine:", err);
     return null;
   }
 }
@@ -859,7 +887,17 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
     const extracted = extractEntities(t);
     lastEntitiesRef.current = mergeEntities(extracted, lastEntitiesRef.current);
 
-    // 1. Live AI through the server when it has a Gemini key (client questions only; owner data stays local)
+    // 1a. Owner copilot through the AI; Latchkey code questions stay on the built-in engine so codes never leave the app
+    if (aiConfigured && activeMode === "admin" && !/latchkey|lockbox|c[oó]digo|\bcodes?\b|llave/i.test(t)) {
+      const answer = await callCopilotLive(t, msgs, appointments);
+      if (answer) {
+        setMsgs((m) => [...m, { from: "ai", text: answer }]);
+        setTyping(false);
+        return;
+      }
+    }
+
+    // 1b. Live AI for client questions through the server when it has a Gemini key
     if (aiConfigured && activeMode === "client") {
       try {
         const geminiResult = await callGeminiLive(t, msgs, lastEntitiesRef.current);
@@ -1053,7 +1091,7 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {aiConfigured
-                ? "Live AI is on: client questions are answered by Google Gemini through our server, using our official price list."
+                ? "Live AI is on: Google Gemini answers through our server, using the official price list for clients and the live booking data for the owner copilot. Latchkey codes, phone numbers and addresses are never sent to the AI."
                 : "Qimmiq is using its built-in concierge engine. Live AI turns on when the business adds a Gemini key on the server."}
             </p>
           </div>

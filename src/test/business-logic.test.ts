@@ -7,6 +7,7 @@ import { PACKAGES } from "@/components/fp/PublicSections";
 import { QUOTE_BREEDS, SERVICE_IDS, WEIGHT_TIERS, priceRange, quote } from "@/lib/pricing";
 import { copilotReply, quoteReply } from "@/lib/qimmiq-replies";
 import { handleApi } from "@/lib/server-api";
+import { buildOpsSnapshot } from "@/lib/copilot-snapshot";
 
 describe("shared price list", () => {
   it("keeps every quote inside the published package floor", () => {
@@ -123,6 +124,11 @@ describe("staff sign-in (server)", () => {
     expect(res!.status).toBe(401);
   });
 
+  it("requires a staff session for the AI owner copilot", async () => {
+    const res = await handleApi(req("/api/qimmiq/copilot", { method: "POST", body: JSON.stringify({ query: "revenue?" }) }), { ...env, GEMINI_API_KEY: "test" });
+    expect(res!.status).toBe(401);
+  });
+
   it("leaves non-API paths to the app", async () => {
     expect(await handleApi(req("/"), env)).toBeNull();
   });
@@ -134,5 +140,79 @@ describe("demo calendar feed", () => {
     expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(5);
     expect(ics).toContain("DTSTART;TZID=America/Toronto:20261008T083000");
     expect(ics).not.toMatch(/4821|3390|416-555/);
+  });
+});
+
+describe("owner copilot snapshot", () => {
+  it("summarises the business without access codes, phones or addresses", async () => {
+    const list = await listAppointments();
+    const snapshot = buildOpsSnapshot(list);
+    expect(snapshot).toContain("Month to date");
+    expect(snapshot).toContain("Today's stops");
+    for (const a of list.filter((x) => x.latchkeyCode || x.ownerPhone)) {
+      if (a.latchkeyCode) expect(snapshot).not.toContain(a.latchkeyCode);
+      if (a.ownerPhone) expect(snapshot).not.toContain(a.ownerPhone);
+    }
+    expect(snapshot).not.toMatch(/9142|4821|3390|7105|1628|Roehampton|Broadway Ave/);
+  });
+});
+
+describe("shared bookings (server, D1)", () => {
+  // Minimal in-memory stand-in for the D1 binding
+  function fakeD1() {
+    const rows = new Map<string, { id: string; date: string; data: string }>();
+    return {
+      rows,
+      prepare(sql: string) {
+        return {
+          bind(...v: unknown[]) {
+            return {
+              async run() {
+                if (sql.startsWith("INSERT OR IGNORE") && !rows.has(String(v[0]))) rows.set(String(v[0]), { id: String(v[0]), date: String(v[1]), data: String(v[2]) });
+                if (sql.startsWith("UPDATE")) rows.get(String(v[2]))!.data = String(v[0]);
+                return {};
+              },
+              async all<T>() {
+                return { results: [...rows.values()].filter((r) => r.date >= String(v[0])) as T[] };
+              },
+              async first<T>() {
+                return (rows.get(String(v[0])) ?? null) as T | null;
+              },
+            };
+          },
+        };
+      },
+    };
+  }
+  const req = (path: string, init?: RequestInit) => new Request(`https://demo.test${path}`, { headers: { "cf-connecting-ip": "203.0.113.9" }, ...init });
+  const booking = { id: "appt-test-1", date: "2026-10-10", service: "full", source: "web", petName: "Milo", breed: "Goldendoodle", total: 180, latchkeyCode: "1234", status: "completed" };
+
+  it("stores public bookings as requests and shows them only to staff", async () => {
+    const env = { STAFF_PASSWORD: "s3cret", BOOKINGS_DB: fakeD1() };
+    const created = await handleApi(req("/api/bookings", { method: "POST", body: JSON.stringify(booking) }), env);
+    expect(created!.status).toBe(201);
+    expect(JSON.parse(env.BOOKINGS_DB.rows.get("appt-test-1")!.data).status).toBe("requested");
+
+    const overwrite = await handleApi(req("/api/bookings", { method: "POST", body: JSON.stringify({ ...booking, petName: "Hacker" }) }), env);
+    expect(overwrite!.status).toBe(201);
+    expect(JSON.parse(env.BOOKINGS_DB.rows.get("appt-test-1")!.data).petName).toBe("Milo");
+
+    expect((await handleApi(req("/api/bookings"), env))!.status).toBe(401);
+    expect((await handleApi(req("/api/bookings/appt-test-1", { method: "PATCH", body: '{"status":"cancelled"}' }), env))!.status).toBe(401);
+
+    const login = await handleApi(req("/api/staff/login", { method: "POST", body: JSON.stringify({ email: "admin@thefreshpooch.ca", password: "s3cret" }) }), env);
+    const cookie = login!.headers.get("set-cookie")!.split(";")[0]!;
+    const list = await handleApi(req("/api/bookings", { headers: { cookie } }), env);
+    expect((await list!.json()).bookings).toHaveLength(1);
+
+    const patched = await handleApi(req("/api/bookings/appt-test-1", { method: "PATCH", headers: { cookie }, body: '{"status":"confirmed"}' }), env);
+    expect(patched!.status).toBe(200);
+    expect(JSON.parse(env.BOOKINGS_DB.rows.get("appt-test-1")!.data).status).toBe("confirmed");
+  });
+
+  it("rejects malformed bookings", async () => {
+    const env = { BOOKINGS_DB: fakeD1() };
+    const bad = await handleApi(req("/api/bookings", { method: "POST", body: JSON.stringify({ ...booking, id: "x'; DROP", date: "tomorrow" }) }), env);
+    expect(bad!.status).toBe(400);
   });
 });

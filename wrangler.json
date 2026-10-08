@@ -5,5 +5,12 @@
   "vars": {
     "DEMO_STAFF_ACCESS": "true",
     "DEMO_STAFF_HINT": "admin@thefreshpooch.ca / pooch2026"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "BOOKINGS_DB",
+      "database_name": "thefreshpooch-bookings",
+      "database_id": "e3bebcb5-b342-42cc-9b67-a96573463d7f"
+    }
+  ]
 }

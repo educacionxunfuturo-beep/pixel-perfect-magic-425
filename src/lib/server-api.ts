@@ -1,4 +1,4 @@
-import { buildQimmiqPrompt, type QimmiqContext } from "./qimmiq-prompt";
+import { buildCopilotPrompt, buildQimmiqPrompt, type QimmiqContext } from "./qimmiq-prompt";
 
 /**
  * Server-only API routes, served by the Cloudflare Worker (src/server.ts).
@@ -12,6 +12,7 @@ import { buildQimmiqPrompt, type QimmiqContext } from "./qimmiq-prompt";
  *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN (secrets), TWILIO_FROM (var)   real SMS sending
  *   GEMINI_API_KEY      secret  live Qimmiq answers through Google Gemini (AI Studio key)
  *   GEMINI_MODELS       var     optional comma-separated model list, tried in order
+ *   BOOKINGS_DB         D1      shared bookings (portal, quote and Qimmiq cart) so staff see them on any device
  */
 
 type Env = Record<string, string | undefined>;
@@ -167,33 +168,22 @@ async function sendSms(request: Request, env: Env): Promise<Response> {
 
 // ---------- Qimmiq through Gemini ----------
 
-async function qimmiq(request: Request, env: Env): Promise<Response> {
-  const apiKey = env["GEMINI_API_KEY"];
-  if (!apiKey) return json({ configured: false }, 503);
-  if (rateLimited(`qimmiq:${clientIp(request)}`, 12, 60 * 1000)) return json({ error: "Too many questions, please wait a minute." }, 429);
+type GeminiTurn = { role: string; parts: { text: string }[] };
 
-  const body = (await request.json().catch(() => ({}))) as {
-    query?: string;
-    history?: { from?: string; text?: string }[];
-    context?: QimmiqContext;
-  };
-  const query = (body.query ?? "").trim().slice(0, 1000);
-  if (!query) return json({ error: "Empty question." }, 400);
-  const history = (body.history ?? []).slice(-6).map((m) => ({
+function readHistory(history: { from?: string; text?: string }[] | undefined): GeminiTurn[] {
+  return (history ?? []).slice(-6).map((m) => ({
     role: m.from === "user" ? "user" : "model",
     parts: [{ text: String(m.text ?? "").slice(0, 2000) }],
   }));
-  const ctx = body.context ?? {};
-  const context: QimmiqContext = {
-    ...(typeof ctx.breed === "string" ? { breed: ctx.breed.slice(0, 60) } : {}),
-    ...(typeof ctx.breedTier === "string" ? { breedTier: ctx.breedTier.slice(0, 20) } : {}),
-    ...(typeof ctx.location === "string" ? { location: ctx.location.slice(0, 60) } : {}),
-  };
+}
 
+/** Asks Gemini; returns null when every model failed or timed out. */
+async function askGemini(env: Env, system: string, contents: GeminiTurn[], temperature: number): Promise<{ text: string; model: string } | null> {
+  const apiKey = env["GEMINI_API_KEY"]!;
   const payload = JSON.stringify({
-    systemInstruction: { parts: [{ text: buildQimmiqPrompt(context) }] },
-    contents: [...history, { role: "user", parts: [{ text: query }] }],
-    generationConfig: { temperature: 0.6, maxOutputTokens: 4096 }, // room for the model's thinking tokens
+    systemInstruction: { parts: [{ text: system }] },
+    contents,
+    generationConfig: { temperature, maxOutputTokens: 4096 }, // room for the model's thinking tokens
   });
 
   // Google retires and overloads models often: try them in order, each with a time limit,
@@ -213,12 +203,139 @@ async function qimmiq(request: Request, env: Env): Promise<Response> {
       if (!res.ok) continue;
       const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
       const text = data.candidates?.[0]?.content?.parts?.filter((p) => !p.thought).map((p) => p.text ?? "").join("") ?? "";
-      if (text) return json({ text, model });
+      if (text) return { text, model };
     } catch {
       // timeout or network error: try the next model
     }
   }
-  return json({ error: "AI provider unavailable." }, 502);
+  return null;
+}
+
+async function qimmiq(request: Request, env: Env): Promise<Response> {
+  if (!env["GEMINI_API_KEY"]) return json({ configured: false }, 503);
+  if (rateLimited(`qimmiq:${clientIp(request)}`, 12, 60 * 1000)) return json({ error: "Too many questions, please wait a minute." }, 429);
+
+  const body = (await request.json().catch(() => ({}))) as {
+    query?: string;
+    history?: { from?: string; text?: string }[];
+    context?: QimmiqContext;
+  };
+  const query = (body.query ?? "").trim().slice(0, 1000);
+  if (!query) return json({ error: "Empty question." }, 400);
+  const ctx = body.context ?? {};
+  const context: QimmiqContext = {
+    ...(typeof ctx.breed === "string" ? { breed: ctx.breed.slice(0, 60) } : {}),
+    ...(typeof ctx.breedTier === "string" ? { breedTier: ctx.breedTier.slice(0, 20) } : {}),
+    ...(typeof ctx.location === "string" ? { location: ctx.location.slice(0, 60) } : {}),
+  };
+
+  const answer = await askGemini(env, buildQimmiqPrompt(context), [...readHistory(body.history), { role: "user", parts: [{ text: query }] }], 0.6);
+  return answer ? json(answer) : json({ error: "AI provider unavailable." }, 502);
+}
+
+/** Owner copilot: staff only; the browser sends a business summary without codes, phones or addresses. */
+async function qimmiqCopilot(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  if (!env["GEMINI_API_KEY"]) return json({ configured: false }, 503);
+  if (!(await readStaffSession(request, rawEnv))) return json({ error: "Staff sign-in required." }, 401);
+  if (rateLimited(`copilot:${clientIp(request)}`, 20, 60 * 1000)) return json({ error: "Too many questions, please wait a minute." }, 429);
+
+  const body = (await request.json().catch(() => ({}))) as { query?: string; history?: { from?: string; text?: string }[]; snapshot?: string };
+  const query = (body.query ?? "").trim().slice(0, 1000);
+  if (!query) return json({ error: "Empty question." }, 400);
+  const snapshot = String(body.snapshot ?? "").slice(0, 12_000);
+
+  const answer = await askGemini(env, buildCopilotPrompt(snapshot), [...readHistory(body.history), { role: "user", parts: [{ text: query }] }], 0.3);
+  return answer ? json(answer) : json({ error: "AI provider unavailable." }, 502);
+}
+
+// ---------- shared bookings (D1) ----------
+
+interface D1Like {
+  prepare(sql: string): { bind(...values: unknown[]): { run(): Promise<unknown>; all<T>(): Promise<{ results: T[] }>; first<T>(): Promise<T | null> } };
+}
+
+function bookingsDb(rawEnv: unknown): D1Like | null {
+  // nitro's Cloudflare handler keeps the Worker bindings on globalThis.__env__
+  const sources = [rawEnv, (globalThis as { __env__?: unknown }).__env__];
+  const db = sources.map((e) => (e && typeof e === "object" ? (e as Record<string, unknown>)["BOOKINGS_DB"] : undefined)).find(Boolean) as D1Like | undefined;
+  return db && typeof db.prepare === "function" ? db : null;
+}
+
+const BOOKING_STATUSES = ["requested", "confirmed", "en_route", "in_progress", "completed", "cancelled"];
+type BookingFields = "id" | "date" | "service" | "source" | "status" | "total" | "weightLbs" | "reference" | "petName" | "breed" | "time" | "address" | "timeWindow" | "postalCode" | "ownerName" | "ownerPhone" | "latchkeyCode" | "notes" | "waiver" | "paymentMethod" | "createdAt" | "completedAt" | "report";
+type BookingRecord = { [K in BookingFields]?: unknown };
+
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : undefined);
+
+/** Keeps only known appointment fields, with length limits; returns null when the booking is not valid. */
+function cleanBooking(raw: BookingRecord): BookingRecord | null {
+  const id = text(raw.id, 40);
+  const date = text(raw.date, 10);
+  if (!id || !/^appt-[a-z0-9-]+$/i.test(id) || !date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  if (!["tidy", "full", "ultimate"].includes(String(raw.service))) return null;
+  if (raw.source !== "portal" && raw.source !== "web") return null;
+  const total = Number(raw.total);
+  const weight = Number(raw.weightLbs);
+  const out: BookingRecord = {
+    id,
+    date,
+    service: raw.service,
+    source: raw.source,
+    status: raw.status === "confirmed" ? "confirmed" : "requested",
+    total: Number.isFinite(total) ? Math.min(Math.max(Math.round(total), 0), 5000) : 0,
+    weightLbs: Number.isFinite(weight) ? Math.min(Math.max(Math.round(weight), 1), 250) : 30,
+    reference: text(raw.reference, 30) ?? id,
+    petName: text(raw.petName, 60) ?? "Dog",
+    breed: text(raw.breed, 60) ?? "",
+    time: text(raw.time, 12) ?? "8:30 AM",
+    address: text(raw.address, 160) ?? "",
+    createdAt: new Date().toISOString(),
+  };
+  for (const [key, max] of [["timeWindow", 40], ["postalCode", 10], ["ownerName", 80], ["ownerPhone", 30], ["latchkeyCode", 20], ["notes", 500], ["waiver", 40], ["paymentMethod", 20]] as const) {
+    const v = text(raw[key], max);
+    if (v) out[key] = v;
+  }
+  return out;
+}
+
+async function createBooking(request: Request, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ shared: false }, 503);
+  if (rateLimited(`booking:${clientIp(request)}`, 10, 10 * 60 * 1000)) return json({ error: "Too many bookings, please wait a few minutes." }, 429);
+  const booking = cleanBooking(((await request.json().catch(() => ({}))) ?? {}) as BookingRecord);
+  if (!booking) return json({ error: "Invalid booking." }, 400);
+  const now = new Date().toISOString();
+  // INSERT OR IGNORE: a request can never overwrite an existing booking
+  await db.prepare("INSERT OR IGNORE INTO bookings (id, date, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(booking.id, booking.date, JSON.stringify(booking), now, now).run();
+  return json({ shared: true, id: booking.id }, 201);
+}
+
+async function listBookings(request: Request, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ shared: false, bookings: [] });
+  if (!(await readStaffSession(request, rawEnv))) return json({ error: "Staff sign-in required." }, 401);
+  const since = new Date(Date.now() - 62 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const { results } = await db.prepare("SELECT data FROM bookings WHERE date >= ? ORDER BY date LIMIT 500").bind(since).all<{ data: string }>();
+  return json({ shared: true, bookings: results.map((r) => JSON.parse(r.data)) });
+}
+
+async function patchBooking(request: Request, rawEnv: unknown, id: string): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ shared: false }, 503);
+  if (!(await readStaffSession(request, rawEnv))) return json({ error: "Staff sign-in required." }, 401);
+  const row = await db.prepare("SELECT data FROM bookings WHERE id = ?").bind(id).first<{ data: string }>();
+  if (!row) return json({ error: "Not found" }, 404);
+  const patch = ((await request.json().catch(() => ({}))) ?? {}) as BookingRecord;
+  const booking = JSON.parse(row.data) as BookingRecord;
+  if (typeof patch.status === "string" && BOOKING_STATUSES.includes(patch.status)) booking.status = patch.status;
+  if (typeof patch.completedAt === "string") booking.completedAt = patch.completedAt.slice(0, 40);
+  if (patch.report && typeof patch.report === "object") {
+    const report: Record<string, string> = {};
+    for (const [k, v] of Object.entries(patch.report as Record<string, unknown>)) if (typeof v === "string" && k.length < 20) report[k] = v.slice(0, 500);
+    booking.report = report;
+  }
+  await db.prepare("UPDATE bookings SET data = ?, updated_at = ? WHERE id = ?").bind(JSON.stringify(booking), new Date().toISOString(), id).run();
+  return json({ ok: true });
 }
 
 // ---------- router ----------
@@ -244,5 +361,10 @@ export async function handleApi(request: Request, rawEnv: unknown): Promise<Resp
   if (pathname === "/api/notifications/sms" && method === "POST") return sendSms(request, env);
   if (pathname === "/api/qimmiq/status" && method === "GET") return json({ configured: Boolean(env["GEMINI_API_KEY"]) });
   if (pathname === "/api/qimmiq" && method === "POST") return qimmiq(request, env);
+  if (pathname === "/api/qimmiq/copilot" && method === "POST") return qimmiqCopilot(request, env, rawEnv);
+  if (pathname === "/api/bookings" && method === "POST") return createBooking(request, rawEnv);
+  if (pathname === "/api/bookings" && method === "GET") return listBookings(request, rawEnv);
+  const bookingPath = /^\/api\/bookings\/(appt-[a-z0-9-]+)$/i.exec(pathname);
+  if (bookingPath && method === "PATCH") return patchBooking(request, rawEnv, bookingPath[1]!);
   return json({ error: "Not found" }, 404);
 }
