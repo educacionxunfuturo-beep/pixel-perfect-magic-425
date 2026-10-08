@@ -38,9 +38,17 @@ function Index() {
 
   // A staff session survives page reloads through its HttpOnly cookie.
   useEffect(() => {
-    getStaffSession().then((s) => setIsAdminAuthenticated(s.authenticated));
+    const params = new URLSearchParams(window.location.search);
+    getStaffSession().then((s) => {
+      setIsAdminAuthenticated(s.authenticated);
+      // tapping a staff alert opens /?view=admin: the dashboard, or the sign-in screen first
+      if (params.get("view") === "admin") {
+        setSurface(s.authenticated ? "admin" : "portal");
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    });
     // password-reset links (/?reset=...) open the pet-parent portal
-    if (new URLSearchParams(window.location.search).has("reset")) setSurface("portal");
+    if (params.has("reset")) setSurface("portal");
   }, []);
 
   const handleNavChange = (s: Surface) => {

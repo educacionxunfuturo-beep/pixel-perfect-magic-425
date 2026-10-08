@@ -3,7 +3,8 @@
   "name": "thefreshpooch",
   "compatibility_date": "2026-10-07",
   "vars": {
-    "DEMO_STAFF_ACCESS": "false"
+    "DEMO_STAFF_ACCESS": "false",
+    "VAPID_PUBLIC_KEY": "BNiP4YfCYC6RpR2Kt0ShElHxnycwiSCQO7a7ZHC2SEkyfL_ihLbFp_oQ105XAX8asomI9e4Rni9XjQeOL6nhaWk"
   },
   "d1_databases": [
     {

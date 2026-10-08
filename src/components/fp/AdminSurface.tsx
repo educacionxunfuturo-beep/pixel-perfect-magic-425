@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
 import { AdminTools } from "./AdminTools";
 import { AdminResets } from "./AdminResets";
+import { StaffAlerts } from "./StaffAlerts";
 import { GOOGLE_RATING } from "./PublicSections";
 import { formatDate, serviceName, torontoToday, updateAppointment, useAppointments, type Appointment } from "@/lib/appointments";
 import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "@/lib/dashboard-stats";
@@ -110,13 +111,10 @@ export function AdminSurface({
   const upcoming = useMemo(() => upcomingBookings(appointments, today), [appointments, today]);
   const pending = useMemo(() => upcoming.filter((a) => a.status === "requested"), [upcoming]);
 
-  // Booking alerts: requests that arrive while the dashboard is open (it refreshes every 20 s).
+  // In-page banner for requests that arrive while the dashboard is open (it refreshes every 20 s).
+  // Phone and desktop alerts with the app closed come from Web Push (StaffAlerts).
   const seenRequests = useRef<Set<string> | null>(null);
   const [newRequests, setNewRequests] = useState(0);
-  const [alertsOn, setAlertsOn] = useState(false);
-  useEffect(() => {
-    setAlertsOn(typeof Notification !== "undefined" && Notification.permission === "granted");
-  }, []);
   useEffect(() => {
     if (!isAuthenticated || !loaded) return;
     if (seenRequests.current === null) {
@@ -127,11 +125,7 @@ export function AdminSurface({
     if (!fresh.length) return;
     fresh.forEach((a) => seenRequests.current!.add(a.id));
     setNewRequests((n) => n + fresh.length);
-    if (alertsOn) {
-      const a = fresh[0]!;
-      new Notification("New booking request", { body: `${a.petName} · ${serviceName(a.service)} · ${formatDate(a.date)}`, tag: a.id });
-    }
-  }, [pending, isAuthenticated, loaded, alertsOn]);
+  }, [pending, isAuthenticated, loaded]);
   useEffect(() => {
     if (!isAuthenticated || typeof document === "undefined") return;
     const original = document.title;
@@ -140,10 +134,6 @@ export function AdminSurface({
       document.title = original;
     };
   }, [pending.length, isAuthenticated]);
-  const enableAlerts = async () => {
-    if (typeof Notification === "undefined") return;
-    setAlertsOn((await Notification.requestPermission()) === "granted");
-  };
 
   const KPIS = [
     { label: `Revenue (${kpi.monthLabel})`, value: money(kpi.revenue), delta: changeLabel(kpi.revenueChange), up: (kpi.revenueChange ?? 0) >= 0, icon: DollarSign },
@@ -393,11 +383,6 @@ export function AdminSurface({
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <Pill tone="muted">From the portal, the online quote and Qimmiq · any device</Pill>
-            {typeof Notification !== "undefined" && (
-              <button onClick={enableAlerts} disabled={alertsOn} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold", alertsOn ? "border-success/40 text-success" : "border-border hover:border-teal hover:text-teal")}>
-                <Bell className="h-3.5 w-3.5" /> {alertsOn ? "Booking alerts on" : "Turn on booking alerts"}
-              </button>
-            )}
           </div>
         </div>
         {upcoming.length === 0 ? (
@@ -437,6 +422,8 @@ export function AdminSurface({
           </div>
         )}
       </div>
+
+      <StaffAlerts />
 
       <AdminResets />
 

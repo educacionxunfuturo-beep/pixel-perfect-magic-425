@@ -1,4 +1,5 @@
 import { buildCopilotPrompt, buildQimmiqPrompt, type QimmiqContext } from "./qimmiq-prompt";
+import { sendPush, type VapidKeys } from "./web-push";
 
 /**
  * Server-only API routes, served by the Cloudflare Worker (src/server.ts).
@@ -13,7 +14,9 @@ import { buildCopilotPrompt, buildQimmiqPrompt, type QimmiqContext } from "./qim
  *   GEMINI_API_KEY      secret  live Qimmiq answers through Google Gemini (AI Studio key)
  *   GEMINI_MODELS       var     optional comma-separated model list, tried in order
  *   BOOKINGS_DB         D1      shared bookings (portal, quote and Qimmiq cart) so staff see them on any device
- *   NTFY_TOPIC          secret  optional; push alert to the owner's phone (ntfy app) for each new booking
+ *   VAPID_PUBLIC_KEY    var     Web Push key pair for staff alerts (public half, base64url)
+ *   VAPID_PRIVATE_KEY   secret  the private half, as a JWK JSON string
+ *   NTFY_TOPIC          secret  optional extra: the same staff alerts through the ntfy app
  *   RESEND_API_KEY      secret  optional; with RESET_EMAIL_FROM (var), password-reset links are emailed
  *                               (otherwise the owner sends them from the dashboard)
  * Pet-parent accounts live in the same D1 database (table customers); see migrations/.
@@ -354,28 +357,121 @@ async function createBooking(request: Request, rawEnv: unknown): Promise<Respons
     .prepare("INSERT OR IGNORE INTO bookings (id, date, data, created_at, updated_at, customer_email) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(booking.id, booking.date, JSON.stringify(booking), now, now, customerEmail)
     .run()) as { meta?: { changes?: number } };
-  if (result?.meta?.changes !== 0) await notifyOwner(request, readEnv(rawEnv), booking);
+  if (result?.meta?.changes !== 0) await notifyOwner(request, readEnv(rawEnv), booking, db);
   return json({ shared: true, id: booking.id }, 201);
 }
 
 const SERVICE_LABELS: Record<string, string> = { tidy: "Bath & Tidy", full: "Premium Full Groom", ultimate: "Ultimate Spa" };
 
 /** Push alert to the owner's phone through ntfy. Only the dog, service and date go out: no address, phone or codes. */
-async function notifyOwner(request: Request, env: Env, booking: BookingRecord) {
-  const topic = env["NTFY_TOPIC"];
-  if (!topic) return;
+async function notifyOwner(request: Request, env: Env, booking: BookingRecord, db: D1Like) {
   const dog = [booking.petName, booking.breed].filter(Boolean).join(", ");
   const when = [booking.date, booking.timeWindow].filter(Boolean).join(" ");
+  await notifyStaff(request, env, db, {
+    kind: "booking",
+    title: "New booking request",
+    body: `${dog}: ${SERVICE_LABELS[String(booking.service)] ?? booking.service}, ${when}, $${booking.total} CAD. Tap to confirm it.`,
+  });
+}
+
+// ---------- staff alerts: Web Push to every device that turned them on, plus a history in D1 ----------
+// Messages carry the dog, service, date and price only: never addresses, phones or access codes.
+
+interface StaffAlert {
+  kind: "booking" | "password" | "test";
+  title: string;
+  body: string;
+}
+
+function vapidKeys(env: Env, request: Request): VapidKeys | null {
+  const publicKey = env["VAPID_PUBLIC_KEY"];
+  const privateKey = env["VAPID_PRIVATE_KEY"];
+  if (!publicKey || !privateKey) return null;
   try {
+    return { publicKey, privateJwk: JSON.parse(privateKey) as JsonWebKey, subject: env["VAPID_SUBJECT"] || new URL("/", request.url).origin };
+  } catch {
+    return null;
+  }
+}
+
+/** Saves the alert in the history and pushes it to staff devices (and to ntfy when NTFY_TOPIC is set). */
+async function notifyStaff(request: Request, env: Env, db: D1Like, alert: StaffAlert): Promise<{ sent: number; devices: number }> {
+  const url = new URL("/?view=admin", request.url).toString();
+  await db.prepare("INSERT INTO staff_notifications (kind, title, body, created_at) VALUES (?, ?, ?, ?)").bind(alert.kind, alert.title, alert.body, new Date().toISOString()).run();
+  const keys = vapidKeys(env, request);
+  let sent = 0;
+  let devices = 0;
+  if (keys) {
+    const { results } = await db.prepare("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE active = ?").bind(1).all<{ endpoint: string; p256dh: string; auth: string }>();
+    devices = results.length;
+    const outcomes = await Promise.all(results.map((sub) => sendPush(sub, { ...alert, url }, keys)));
+    for (const [i, outcome] of outcomes.entries()) {
+      if (outcome === "ok") sent++;
+      if (outcome === "gone") await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(results[i]!.endpoint).run();
+    }
+  }
+  const topic = env["NTFY_TOPIC"];
+  if (topic) {
     await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
       method: "POST",
-      headers: { Title: "New booking request", Tags: "dog", Click: new URL("/", request.url).toString() },
-      body: `${dog}: ${SERVICE_LABELS[String(booking.service)] ?? booking.service}, ${when}, $${booking.total} CAD. Confirm it in the owner dashboard.`,
+      headers: { Title: alert.title, Tags: alert.kind === "password" ? "key" : "dog", Click: url },
+      body: alert.body,
       signal: AbortSignal.timeout(3_000),
-    });
-  } catch {
-    // the booking is saved either way; the dashboard shows it
+    }).catch(() => undefined);
   }
+  return { sent, devices };
+}
+
+async function staffPush(request: Request, env: Env, rawEnv: unknown, pathname: string): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  const staff = await readStaffSession(request, rawEnv);
+  if (!staff) return json({ error: "Staff sign-in required." }, 401);
+  if (!db) return json({ error: "Alerts are not available on this server." }, 503);
+
+  if (pathname === "/api/push/key") {
+    const keys = vapidKeys(env, request);
+    return json(keys ? { publicKey: keys.publicKey } : { publicKey: null });
+  }
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { endpoint?: string; keys?: { p256dh?: string; auth?: string }; label?: string };
+  if (pathname === "/api/push/subscribe") {
+    const endpoint = String(body.endpoint ?? "");
+    const p256dh = String(body.keys?.p256dh ?? "");
+    const auth = String(body.keys?.auth ?? "");
+    if (!/^https:\/\//.test(endpoint) || endpoint.length > 1000 || p256dh.length < 80 || p256dh.length > 100 || auth.length < 16 || auth.length > 40) {
+      return json({ error: "Invalid subscription." }, 400);
+    }
+    await db
+      .prepare("INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth, staff_email, label, active, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)")
+      .bind(endpoint, p256dh, auth, staff.email, String(body.label ?? "").slice(0, 80), new Date().toISOString())
+      .run();
+    return json({ ok: true });
+  }
+  if (pathname === "/api/push/unsubscribe") {
+    await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(String(body.endpoint ?? "")).run();
+    return json({ ok: true });
+  }
+  // /api/push/test
+  const result = await notifyStaff(request, env, db, { kind: "test", title: "The Fresh Pooch alerts are on", body: "New booking requests and password requests will show up like this." });
+  return json(result);
+}
+
+/** Alert history for the dashboard (last 50) and the unread count. */
+async function staffNotifications(request: Request, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!(await readStaffSession(request, rawEnv))) return json({ error: "Staff sign-in required." }, 401);
+  if (!db) return json({ notifications: [], unread: 0, devices: 0 });
+  if (request.method === "POST") {
+    await db.prepare("UPDATE staff_notifications SET read = 1 WHERE read = ?").bind(0).run();
+    return json({ ok: true });
+  }
+  const { results } = await db.prepare("SELECT id, kind, title, body, created_at, read FROM staff_notifications ORDER BY id DESC LIMIT ?").bind(50).all<{ id: number; kind: string; title: string; body: string; created_at: string; read: number }>();
+  const unread = await db.prepare("SELECT COUNT(*) AS n FROM staff_notifications WHERE read = ?").bind(0).first<{ n: number }>();
+  const devices = await db.prepare("SELECT COUNT(*) AS n FROM push_subscriptions WHERE active = ?").bind(1).first<{ n: number }>();
+  return json({
+    notifications: results.map((r) => ({ id: r.id, kind: r.kind, title: r.title, body: r.body, createdAt: r.created_at, read: Boolean(r.read) })),
+    unread: unread?.n ?? 0,
+    devices: devices?.n ?? 0,
+  });
 }
 
 async function listBookings(request: Request, rawEnv: unknown): Promise<Response> {
@@ -601,15 +697,11 @@ async function forgotPassword(request: Request, env: Env, rawEnv: unknown): Prom
       }).catch(() => undefined);
     } else {
       await db.prepare("INSERT OR REPLACE INTO reset_requests (email, requested_at, handled) VALUES (?, ?, 0)").bind(email, new Date().toISOString()).run();
-      const topic = env["NTFY_TOPIC"];
-      if (topic) {
-        await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
-          method: "POST",
-          headers: { Title: "Password reset request", Tags: "key", Click: new URL("/", request.url).toString() },
-          body: `${profile.name} asked to reset their password. Send them a reset link from the owner dashboard.`,
-          signal: AbortSignal.timeout(3_000),
-        }).catch(() => undefined);
-      }
+      await notifyStaff(request, env, db, {
+        kind: "password",
+        title: "Password reset request",
+        body: `${profile.name} asked to reset their password. Tap to send them a reset link.`,
+      });
     }
   }
   // same answer whether or not the account exists
@@ -703,6 +795,8 @@ export async function handleApi(request: Request, rawEnv: unknown): Promise<Resp
   if (pathname === "/api/account/vaccines" && method === "POST") return saveVaccine(request, env, rawEnv);
   if (pathname === "/api/account/forgot" && method === "POST") return forgotPassword(request, env, rawEnv);
   if (pathname === "/api/account/reset" && method === "POST") return resetPassword(request, env, rawEnv);
+  if ((pathname === "/api/push/key" && method === "GET") || (["/api/push/subscribe", "/api/push/unsubscribe", "/api/push/test"].includes(pathname) && method === "POST")) return staffPush(request, env, rawEnv, pathname);
+  if (pathname === "/api/staff/notifications" && (method === "GET" || method === "POST")) return staffNotifications(request, rawEnv);
   if (pathname === "/api/staff/password-resets" && (method === "GET" || method === "POST")) return staffResets(request, env, rawEnv);
   const docPath = /^\/api\/vaccine-docs\/(doc-[0-9a-f-]{36})$/.exec(pathname);
   if (docPath && method === "GET") return vaccineDoc(request, env, rawEnv, docPath[1]!);

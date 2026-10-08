@@ -7,7 +7,7 @@ import beforeImg from "@/assets/before.jpg";
 import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
-import { Packages, PressBanner, Reviews, VanMoments, Faq, PACKAGES, type PackageId } from "./PublicSections";
+import { Packages, PressBanner, Reviews, VanMoments, Faq, GOOGLE_RATING, PACKAGES, type PackageId } from "./PublicSections";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { PetParentAppSection } from "./PetParentAppSection";
 import { SpaReels } from "./SpaReels";
@@ -370,7 +370,7 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
             />
             <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-card/95 px-3.5 py-1.5 text-xs font-bold backdrop-blur shadow-sm border border-border/80">
               <Star className="h-3.5 w-3.5 fill-amber text-amber" />
-              <span>5.0 • <strong className="text-teal font-extrabold tabular-nums">{count}+</strong> Verified Toronto Grooms</span>
+              <span>{GOOGLE_RATING.value} on Google • <strong className="text-teal font-extrabold tabular-nums">{count}+</strong> happy Toronto dogs</span>
             </div>
             <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-card/90 px-3 py-1 text-xs font-semibold text-teal backdrop-blur">
               <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
