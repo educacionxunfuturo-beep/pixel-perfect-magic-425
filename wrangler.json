@@ -1,5 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "thefreshpooch",
-  "compatibility_date": "2026-10-07"
+  "compatibility_date": "2026-10-07",
+  "vars": {
+    "DEMO_STAFF_ACCESS": "true",
+    "DEMO_STAFF_HINT": "admin@thefreshpooch.ca / pooch2026"
+  }
 }

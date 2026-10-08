@@ -29,6 +29,8 @@ export interface DispatchResult {
   whatsappUrl?: string;
   timestamp: string;
   costEstimateCad: string;
+  /** True when nothing was actually sent (provider not configured): the UI must say so. */
+  simulated?: boolean;
 }
 
 // Clean Canadian phone number to E.164 (+1XXXXXXXXXX)
@@ -89,50 +91,38 @@ export async function dispatchNotification(
   }
 
   if (channel === "email") {
-    // Transactional Email (Resend / SendGrid compatible format)
-    console.log(`[Email Dispatch] To: ${data.toEmail || "client@domain.ca"} | Subject: The Fresh Pooch Update | Body: ${message}`);
+    // No email provider is connected yet: report it instead of pretending the email went out.
     return {
-      success: true,
+      success: false,
+      simulated: true,
       channel: "email",
       message,
       timestamp: now,
-      costEstimateCad: "$0.00 CAD (Included in Free Tier up to 3,000/mo)",
+      costEstimateCad: "Email sending is not set up yet",
     };
   }
 
-  // SMS Channel (Twilio API simulation or live endpoint)
-  const twilioConfigured = Boolean(
-    import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN
-  );
-
-  if (twilioConfigured) {
-    try {
-      // In production, SMS is dispatched through Cloudflare Worker backend to keep tokens secure
-      const res = await fetch("/api/notifications/sms", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: formattedPhone, body: message }),
-      });
-      if (res.ok) {
-        return {
-          success: true,
-          channel: "sms",
-          message,
-          timestamp: now,
-          costEstimateCad: "$0.01 CAD (~$0.0079 USD per Canadian SMS)",
-        };
-      }
-    } catch {
-      // Fall through to simulated success
+  // SMS goes through the server (src/lib/server-api.ts), which holds the Twilio credentials.
+  try {
+    const res = await fetch("/api/notifications/sms", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: formattedPhone, body: message }),
+    });
+    const result = (await res.json().catch(() => ({}))) as { sent?: boolean; error?: string };
+    if (res.ok && result.sent) {
+      return { success: true, channel: "sms", message, timestamp: now, costEstimateCad: "$0.01 CAD (~$0.0079 USD per Canadian SMS)" };
     }
+    return {
+      success: false,
+      simulated: true,
+      channel: "sms",
+      message,
+      timestamp: now,
+      costEstimateCad: res.status === 501 ? "Demo: Twilio is not configured, no SMS was sent" : result.error ?? "SMS could not be sent",
+    };
+  } catch {
+    return { success: false, simulated: true, channel: "sms", message, timestamp: now, costEstimateCad: "SMS could not be sent (offline)" };
   }
-
-  // Graceful active fallback
-  return {
-    success: true,
-    channel: "sms",
-    message,
-    timestamp: now,
-    costEstimateCad: "$0.01 CAD per message (~$4-$5 CAD/month for 400 SMS)",
-  };
 }

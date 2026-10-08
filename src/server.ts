@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { buildDemoCalendar, DEMO_CALENDAR_PATH } from "./lib/demo-calendar";
+import { handleApi } from "./lib/server-api";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -47,6 +48,8 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    const apiResponse = await handleApi(request, env);
+    if (apiResponse) return apiResponse;
     if (request.method === "GET" && new URL(request.url).pathname === DEMO_CALENDAR_PATH) {
       return new Response(buildDemoCalendar(), {
         headers: {

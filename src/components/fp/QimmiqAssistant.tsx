@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { X, Send, ShoppingCart, Check, CreditCard, Trash2, ArrowRight, Cpu, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/api";
 import qimmiqAvatar from "@/assets/qimmiq-avatar.jpg";
-import { recordRealCompletedGroom } from "@/lib/useLiveGroomCounter";
+import { createAppointment, torontoToday, addDays, useAppointments, type Appointment } from "@/lib/appointments";
+import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/pricing";
+import {
+  bathOnlyReply, bestServiceReply, bookingReply, copilotReply, differenceReply, discountReply, menuReply, priceTableReply, quoteReply, serviceRequestReply,
+} from "@/lib/qimmiq-replies";
 
 type Mode = "client" | "admin";
 type Lang = "en" | "es" | "de" | "fr" | "it" | "pt";
@@ -53,6 +56,22 @@ interface ExtractedEntities {
   location?: string;
   isBathOnly?: boolean;
   isFullGroom?: boolean;
+}
+
+/** Current message wins; anything it doesn't mention is remembered from earlier turns. */
+function mergeEntities(current: ExtractedEntities, previous?: ExtractedEntities): ExtractedEntities {
+  const merged: ExtractedEntities = {};
+  const breed = current.breed ?? previous?.breed;
+  const breedTier = current.breedTier ?? previous?.breedTier;
+  const location = current.location ?? previous?.location;
+  const isBathOnly = current.isBathOnly ?? previous?.isBathOnly;
+  const isFullGroom = current.isFullGroom ?? previous?.isFullGroom;
+  if (breed !== undefined) merged.breed = breed;
+  if (breedTier !== undefined) merged.breedTier = breedTier;
+  if (location !== undefined) merged.location = location;
+  if (isBathOnly !== undefined) merged.isBathOnly = isBathOnly;
+  if (isFullGroom !== undefined) merged.isFullGroom = isFullGroom;
+  return merged;
 }
 
 function extractEntities(text: string): ExtractedEntities {
@@ -270,92 +289,21 @@ async function callGeminiLive(
   query: string,
   history: Msg[],
   entities: ExtractedEntities,
-  lang: Lang,
-  apiKey: string
 ): Promise<AgentReplyResult | null> {
   try {
-    const breedInfo = entities.breed ? `Known pet breed: ${entities.breed} (${entities.breedTier || "medium"} tier)` : "Breed: Not specified yet";
-    const locInfo = entities.location ? `Known Toronto neighborhood: ${entities.location}` : "Location: Toronto general";
-
-    const systemPrompt = `You are Qimmiq, the intelligent, warm, consultative, and sales-focused AI concierge for "The Fresh Pooch Toronto" (a luxury, 100% cage-free mobile dog spa in Toronto, Canada).
-
-CORE BRAND FACTS:
-- Cage-Free Philosophy: We NEVER use cages or cage dryers. Every appointment is a 1-on-1 private spa session inside our custom, heated luxury Mercedes Sprinter trailer parked right in the client's driveway or curbside.
-- Services & Transparent CAD Pricing:
-  1. "Bath & Tidy" (Hydro-Bath & Essential Hygiene): Warm organic botanical hydrobath, 100% cage-free gentle hand fluff dry, deep brush-out & de-shedding, nail clipping & dremel buffing, antiseptic ear cleaning, and pad tidy. IMPORTANT: This package DOES NOT include a body haircut or scissor styling. Rates: Small pups (<20 lbs) $105 CAD; Medium (20-45 lbs) $125 CAD; Large (45-75 lbs, e.g. Golden Retriever, Labrador) $155 CAD; Giant (76+ lbs) $185 CAD.
-  2. "Premium Full Groom": Includes everything in Bath & Tidy PLUS full custom breed haircut & hand-scissor styling. Rates: Small $120–$140 CAD; Medium $145–$185 CAD; Large $185–$225 CAD; Giant $215–$260 CAD.
-  3. "The Ultimate Pooch Spa & Cut": The royal treatment with deep de-shedding blowout, artisan scissor styling, winter salt paw balm, and an Organic Blueberry Facial ($195–$235 CAD).
-  4. Popular Add-ons: Organic Blueberry Facial ($15 CAD), Winter Salt Paw Balm ($12 CAD), Teeth Brushing ($15 CAD).
-- Welcome Privilege / Coupon: Code "TORONTOFRESH15" gives 15% OFF their first visit + a FREE Organic Blueberry Facial ($15 CAD value).
-- Latchkey Contactless Service: Secure lockbox/smart lock system (AES-256 encrypted). We groom 1-on-1 while pet parents work, return the pet safely inside, refill fresh water, and send photo report cards.
-- Operating Hours: Open 7 days a week, Monday through Sunday, 8:30 AM to 6:00 PM.
-- Toronto Neighborhoods: Midtown (Wed/Fri), Downtown (Mon/Wed), The Annex (Tue/Thu), Rosedale & Forest Hill (Thu), The Beaches (Sat), Yorkville, Leaside, North York, Etobicoke, Scarborough, and GTA.
-- Payment Methods: Apple Pay, Google Pay, Interac e-Transfer, Visa, Mastercard, American Express.
-
-CONVERSATION & SALES CLOSING RULES:
-1. Speak in the EXACT language used by the user (if Spanish -> natural, warm Spanish; if English -> Canadian English; if German -> German; if French -> French; etc.).
-2. Always answer directly, empathetically, and conversationally like an expert human concierge. Never repeat generic greetings or fallbacks.
-3. If the user asks whether there is a bath-only service, confirm enthusiastically that YES, Bath & Tidy is an independent service with NO haircut, explain what it includes, provide pricing, and offer to add it to their cart.
-4. If the user expresses a desire to book or hire a service, present the options clearly with prices and guide them to checkout with their 15% discount.
-5. Context: ${breedInfo}. ${locInfo}.
-
-ACTIONABLE CART ITEMS:
-Whenever you recommend or discuss specific services that the user might want to buy or book, append at the VERY END of your message a JSON block formatted exactly like this:
-\`\`\`json
-{
-  "actionItems": [
-    {
-      "id": "bath-tidy-rec",
-      "name": "Bath & Tidy",
-      "price": 125,
-      "category": "package",
-      "icon": "🛁",
-      "badge": "No Haircut",
-      "highlights": "Warm hydrobath, hand fluff dry, ear & nail care"
-    }
-  ]
-}
-\`\`\`
-Do not include commentary inside the json block. Keep your conversational response above it.`;
-
-    const contents: any[] = [];
-    
-    // Add user turns from history (last 5 turns)
-    const recent = history.slice(-5);
-    recent.forEach((m) => {
-      contents.push({
-        role: m.from === "user" ? "user" : "model",
-        parts: [{ text: m.text }],
-      });
+    // The server (src/lib/server-api.ts) holds the Gemini key and builds the prompt from the shared price list.
+    const res = await fetch("/api/qimmiq", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        history: history.slice(-6).map((m) => ({ from: m.from, text: m.text })),
+        context: { breed: entities.breed, breedTier: entities.breedTier, location: entities.location },
+      }),
     });
-
-    // Add current query
-    contents.push({
-      role: "user",
-      parts: [{ text: query }],
-    });
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000,
-          },
-        }),
-      }
-    );
-
     if (!res.ok) return null;
-    const data = await res.json();
-    const candidate = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const data = (await res.json()) as { text?: string };
+    const candidate = data?.text;
     if (!candidate) return null;
 
     let rawText = candidate;
@@ -364,7 +312,7 @@ Do not include commentary inside the json block. Keep your conversational respon
     const jsonMatch = rawText.match(/```json\s*(\{[\s\S]*?\})\s*```/i);
     if (jsonMatch) {
       try {
-        const parsed = JSON.parse(jsonMatch[1]);
+        const parsed = JSON.parse(jsonMatch[1] ?? "{}");
         if (Array.isArray(parsed.actionItems)) {
           actionItems = parsed.actionItems;
         } else if (Array.isArray(parsed.recommended)) {
@@ -376,7 +324,7 @@ Do not include commentary inside the json block. Keep your conversational respon
       }
     }
 
-    return { text: rawText, actionItems };
+    return { text: rawText, ...(actionItems ? { actionItems } : {}) };
   } catch (err) {
     console.warn("Gemini Live API error, falling back to local engine:", err);
     return null;
@@ -388,7 +336,8 @@ function generateAgentReply(
   mode: Mode,
   activeLang: Lang = "en",
   turnCount: number = 0,
-  lastEntities?: ExtractedEntities
+  lastEntities?: ExtractedEntities,
+  appointments: Appointment[] = [],
 ): AgentReplyResult {
   const explicitSwitch = checkExplicitLanguageSwitch(query);
   const detectedLang = explicitSwitch || detectLanguage(query, activeLang);
@@ -396,13 +345,7 @@ function generateAgentReply(
   const lang: Lang = detectedLang === "es" ? "es" : "en";
   const s = query.toLowerCase();
   const currentEntities = extractEntities(query);
-  const entities: ExtractedEntities = {
-    breed: currentEntities.breed || lastEntities?.breed,
-    breedTier: currentEntities.breedTier || lastEntities?.breedTier,
-    location: currentEntities.location || lastEntities?.location,
-    isBathOnly: currentEntities.isBathOnly !== undefined ? currentEntities.isBathOnly : lastEntities?.isBathOnly,
-    isFullGroom: currentEntities.isFullGroom !== undefined ? currentEntities.isFullGroom : lastEntities?.isFullGroom,
-  };
+  const entities: ExtractedEntities = mergeEntities(currentEntities, lastEntities);
 
   const profile = getUserProfile();
   const userName = profile.name;
@@ -411,42 +354,7 @@ function generateAgentReply(
   // 1. EXPLICIT LANGUAGE SWITCH / TRANSLATION REQUEST
   if (explicitSwitch) {
     if (explicitSwitch === "en") {
-      if (entities.breed || entities.location) {
-        return {
-          text: `Certainly! Here is the quote in Canadian English: 🐾\n\nFor a **${entities.breed || "dog"}** in **${entities.location || "Toronto"}**:\n\n• 🛁 **Hydro-Bath & De-Shedding (Bath & Tidy):** **$155–$175 CAD**\n  *Includes:* Warm botanical hydrobath, deep undercoat de-shedding to remove loose dead fur, gentle hand blow-dry (100% cage-free), nail clipping & buffing, ear cleansing, and sanitary tidy.\n\n• ✂️ **The Ultimate Pooch Spa & Cut:** **$195–$225 CAD**\n  *Adds:* Custom artisan scissor styling, winter salt paw protection balm, and an Organic Blueberry Facial.\n\n📍 **Schedule:** Our luxury mobile van visits ${entities.location || "your neighborhood"} on set weekly route days.\n\n🎁 **Welcome Privilege:** Use code **\`TORONTOFRESH15\`** for **15% OFF** + a Free Organic Blueberry Facial ($15 CAD value).\n\nTap below to add your preferred package directly to your cart and book your doorstep visit:`,
-          actionItems: [
-            {
-              id: "bath-shed-en",
-              name: "Hydro-Bath & De-Shedding",
-              price: 155,
-              category: "package",
-              icon: "🛁",
-              badge: "100% Cage-Free",
-              highlights: "Warm botanical bath, undercoat blowout, ears & nails",
-              breed: entities.breed || "Golden Retriever",
-            },
-            {
-              id: "ultimate-spa-en",
-              name: "The Ultimate Pooch Spa & Cut",
-              price: 195,
-              category: "package",
-              icon: "✨",
-              badge: "Royal Luxury",
-              highlights: "Scissor styling, Blueberry Facial & Winter Paw Balm",
-              breed: entities.breed || "Golden Retriever",
-            },
-            {
-              id: "facial-addon-en",
-              name: "Organic Blueberry Facial",
-              price: 15,
-              category: "addon",
-              icon: "🫐",
-              badge: "FREE with Code",
-              highlights: "Tear-stain cleanser & sweet artisan scent",
-            },
-          ],
-        };
-      }
+      if (entities.breed || entities.location) return quoteReply("en", entities);
       return {
         text: `Certainly! I'd be delighted to speak in Canadian English with you. 🐾\n\nHow are you and your pooch doing today? I can help you with an exact quote for your dog's breed, check what days our mobile spa is in your Toronto neighborhood, or guide you to book a 1-on-1 cage-free session. What can I do for you?`,
       };
@@ -459,219 +367,33 @@ function generateAgentReply(
     }
   }
 
-  // 2. ADMIN COPILOT REPLIES
-  if (mode === "admin") {
-    if (s.includes("revenue") || s.includes("ingreso") || s.includes("kpi") || s.includes("balance") || s.includes("ganancia") || s.includes("umsatz")) {
-      return {
-        text: lang === "en"
-          ? "📊 **Daily Operations & Revenue Executive Summary:**\n\n• **Today's Completed Appointments:** 5 spa services in Midtown & The Annex.\n• **Gross Revenue Collected Today:** $860.00 CAD.\n• **Month-to-Date Revenue:** $21,280.00 CAD (+15.8% vs target).\n• **Average Ticket:** $154.20 CAD per dog.\n• **Tips Collected:** $142.00 CAD (16.5% avg, 100% disbursed to groomers).\n• **Van #1 Route Utilization:** 94% booked capacity.\n\n*Key Driver:* 54 active VIP Pooch Club members generate $7,830.00 CAD in predictable monthly recurring revenue."
-          : "📊 **Resumen Financiero y Operaciones de Hoy:**\n\n• **Citas de hoy:** 5 servicios de spa completados en Midtown y The Annex.\n• **Ingresos recaudados hoy:** $860.00 CAD.\n• **Facturación del mes:** $21,280.00 CAD (+15.8% sobre objetivo).\n• **Ticket promedio:** $154.20 CAD por perro.\n• **Propinas hoy:** $142.00 CAD (16.5% promedio, 100% transferidas a groomers).\n• **Ocupación de van #1:** 94% de slots reservados.\n\n*Hito operacional:* 54 perritos con suscripción VIP activa generan $7,830.00 CAD de MRR garantizado.",
-      };
-    }
-
-    if (s.includes("water") || s.includes("agua") || s.includes("van") || s.includes("tank") || s.includes("fuel") || s.includes("combustible") || s.includes("wasser")) {
-      return {
-        text: lang === "en"
-          ? "🚐 **Live Telemetry — Mobile Van #1 (Luxury Spa Trailer):**\n\n• **Fresh Heated Water Tank:** 72% (≈ 95 Litres available — sufficient for 4 more full grooms without refilling).\n• **Greywater Tank:** 31% capacity.\n• **Generator / Eco-Fuel Level:** 78% (next refill scheduled Friday morning).\n• **Solar & Lithium Battery Bank:** 88% charge.\n• **Next Preventive Maintenance:** Dec 12 (water pump & silent generator inspection).\n• **Current GPS Route Location:** Roehampton Ave Corridor, Midtown Toronto (M4P)."
-          : "🚐 **Telemetría en Vivo — Van #1 (Luxury Mobile Spa):**\n\n• **Tanque de Agua Dulce:** 72% (~95 Litros disponibles, suficiente para 4 servicios adicionales sin recargar).\n• **Tanque de Aguas Grises:** 31% de capacidad (vaciado seguro programado al fin de turno).\n• **Combustible / Generador silencioso:** 78% (próximo repostaje el viernes).\n• **Baterías Eco-Litio & Solar:** 88% de carga.\n• **Próximo Mantenimiento Preventivo:** 12 de Diciembre (inspección de bomba y fluidos).\n• **Ubicación GPS actual:** Corredor Roehampton Ave, Midtown (M4P 1R4).",
-      };
-    }
-
-    if (s.includes("latchkey") || s.includes("code") || s.includes("codigo") || s.includes("código") || s.includes("llave") || s.includes("schlüssel")) {
-      return {
-        text: lang === "en"
-          ? "🔑 **Active Latchkey Codes for Today's Toronto Stops:**\n\n• **Midtown (10:00 AM):** Barnaby (Goldendoodle) — Code: `4821` (Side wooden gate; indoor cat Jasper in sunroom).\n• **The Annex (12:30 PM):** Winston (Poodle) — Code: `9042` (Smart Lock Schlage).\n• **Rosedale (3:00 PM):** Coco (Pomeranian) — Code: `1537` (Porch lockbox combination).\n\n*Security Protocol:* All codes are secured via AES-256 encryption and only revealed in the Groomer App when within 50 meters of the home via GPS."
-          : "🔑 **Códigos Latchkey Activos de Hoy (Toronto):**\n\n• **Midtown (10:00 AM):** Barnaby (Goldendoodle) — Código: `4821` (Portón lateral de madera; gato Jasper en terraza).\n• **The Annex (12:30 PM):** Winston (Poodle) — Código: `9042` (Smart Lock Schlage).\n• **Rosedale (3:00 PM):** Coco (Pomeranian) — Código: `1537` (Lockbox con combinación en porche).\n\n*Protocolo de Seguridad:* Todos los códigos se encriptan bajo AES-256 geolocalizado. Solo se revelan en la app del peluquero certificado cuando el GPS detecta la van a menos de 50 metros del domicilio.",
-      };
-    }
-
-    return {
-      text: lang === "en"
-        ? "👨‍💼 **Operations Copilot Active:**\nI can provide live updates on today's revenue ($860 CAD), Van #1 freshwater (72%) & fuel, active Latchkey security codes, neighborhood route densities, or vaccine compliance audits. What would you like to review?"
-        : "👨‍💼 **Copiloto de Operaciones Qimmiq Online:**\nPuedo informarte en vivo sobre ingresos ($860 hoy / $21,280 mes), telemetría de la Van #1 (agua 72%), códigos Latchkey activos, saturación de rutas por barrios o auditoría de vacunas. ¿Qué deseas consultar?",
-    };
-  }
+  // 2. OWNER COPILOT: figures come from the appointment store
+  if (mode === "admin") return copilotReply(s, lang, appointments);
 
   // 3. SPECIALIZED INQUIRY: BATH ONLY / "SOLO BAÑO" / "HAY SOLO DE ESE?"
   const isBathOnlyInquiry =
     /solo\s*ba[ñn]o|solamente\s*ba[ñn]o|servicio\s*de\s*ba[ñn]o|solo\s*ba[ñn]ar|solo\s*de\s*ese|existe\s*solo|hay\s*solo|solo\s*pregunto\s*si\s*(solo\s*)?existe|solo\s*ba[ñn]an|ba[ñn]o\s*solamente|solo\s*quiero\s*ba[ñn]ar|bath\s*only|only\s*a?\s*bath|just\s*a?\s*bath|only\s*bath|only\s*wash|just\s*wash|wash\s*only|bain\s*seulement|nur\s*baden/i.test(s) ||
     ((s.includes("bañ") || s.includes("bath") || s.includes("bain") || s.includes("baden")) && (s.includes("solo") || s.includes("only") || s.includes("just") || s.includes("existe") || s.includes("hay") || s.includes("pregunt")));
 
-  if (isBathOnlyInquiry) {
-    if (entities.breed) {
-      const b = entities.breed;
-      const price = entities.breedTier === "small" ? 105 : entities.breedTier === "large" ? 155 : entities.breedTier === "giant" ? 185 : 125;
-      const discounted = (price * 0.85).toFixed(2);
-
-      return {
-        text: lang === "en"
-          ? `🐾 **Yes, absolutely! We have an independent Bath-Only package for your ${b}!**\n\nOur service is called **Hydro-Bath & De-Shedding (Bath & Tidy)**. It is specifically designed for dogs who need deep hygiene, undercoat removal, and gentle care **without any body hair clipper or scissor haircut**:\n\n• 🛁 **Warm Organic Botanical Hydrobath:** Therapeutic warm water with gentle hypoallergenic shampoo.\n• 💨 **100% Cage-Free Hand Blow-Dry:** High-velocity fluff dry that expels loose dead hair (zero cage dryers, zero stress).\n• 🐾 **Nail Trimming & Dremel Buffing:** Smooth, rounded edges that won't scratch floors.\n• 👂 **Antiseptic Ear Cleansing & Pad Tidy:** Complete ear care and pad clearing.\n• ❌ **No Body Haircut or Scissor Trimming.**\n\n💵 **Price for your ${b}:** **$${price} CAD** (or only **$${discounted} CAD** with code \`TORONTOFRESH15\`).\n🎁 **Bonus:** Includes a **FREE Organic Blueberry Facial** ($15 CAD value)!\n\n👇 **Tap below to add the Bath & Tidy package directly to your cart:**`
-          : `🐾 **¡Sí, por supuesto! Contamos exactamente con un servicio de solo baño para tu ${b}!**\n\nNuestro paquete se llama **Hidro-Baño & Deslanado Profundo (Bath & Tidy)**. Está especialmente pensado para perritos que necesitan higiene profunda y cuidado del pelaje **sin cortar el largo de su pelo corporal**:\n\n• 🛁 **Hidrobaño tibio con champú botánico orgánico:** Limpieza terapéutica hipoalergénica.\n• 💨 **Secado suave 100% a mano sin jaulas:** Turbina de velocidad gradual para expulsar el pelo muerto suelto (jamás usamos jaulas de secado).\n• 🐾 **Corte y limado de uñas con torno suave:** Quedan redondeadas para no rayar pisos.\n• 👂 **Limpieza antiséptica de oídos y despeje de almohadillas:** Higiene completa.\n• ❌ **Sin corte de pelo corporal con máquina ni tijera.**\n\n💵 **Tarifa para tu ${b}:** **$${price} CAD** (con el cupón **\`TORONTOFRESH15\`** te queda en solo **$${discounted} CAD**).\n🎁 **Beneficio de bienvenida:** Incluye un **Facial de Arándanos Orgánico GRATIS** ($15 CAD de regalo).\n\n👇 **Agrega el servicio de solo baño directamente a tu carrito con 1 clic:**`,
-        actionItems: [
-          {
-            id: `bath-tidy-${b.toLowerCase().replace(/\s+/g, "-")}`,
-            name: `Bath & Tidy (Solo Baño - ${b})`,
-            price: price,
-            category: "package",
-            icon: "🛁",
-            badge: "Sin Corte de Pelo",
-            highlights: "Hidrobaño tibio, secado 100% a mano sin jaulas, uñas y oídos",
-            breed: b,
-          },
-          {
-            id: "blueberry-facial-free",
-            name: "Organic Blueberry Facial",
-            price: 15,
-            category: "addon",
-            icon: "🫐",
-            badge: "GRATIS con Cupón",
-            highlights: "Limpieza facial de manchas lagrimales y aroma delicioso",
-          },
-        ],
-      };
-    }
-
-    // General bath-only question (no breed specified yet)
-    return {
-      text: lang === "en"
-        ? `🐾 **Yes, absolutely! We offer an independent, bath-only package called "Bath & Tidy"!**\n\nYou are never forced to book a full haircut. Our **Bath & Tidy (Hydro-Bath & Essential Hygiene)** is designed specifically for dogs that only need deep cleansing, de-shedding, and freshness **without cutting their coat length**:\n\n✨ **What Bath & Tidy includes:**\n• 🛁 **Warm botanical hydrobath:** Therapeutic organic wash customized to their skin.\n• 💨 **100% Cage-free hand blow-dry:** Gentle high-velocity hand drying (zero cages ever).\n• 🐾 **Nail clipping & smooth dremel buffing:** Rounded tips that protect hardwood.\n• 👂 **Antiseptic ear cleansing & pad clearing:** Complete hygiene maintenance.\n• ❌ **Does NOT include:** Body scissor styling or machine clipper haircut.\n\n💵 **Transparent Bath & Tidy Rates by Weight:**\n• **Small Dogs (<20 lbs, e.g. Shih Tzu, Pom):** $105 CAD\n• **Medium Dogs (20–45 lbs, e.g. Frenchie, Beagle):** $125 CAD\n• **Large Dogs (45–75 lbs, e.g. Golden, Lab):** $155 CAD\n• **Giant Dogs (76+ lbs, e.g. Bernedoodle):** $185 CAD\n\n🎁 **Welcome Privilege:** Use code **\`TORONTOFRESH15\`** for **15% OFF** + Free Organic Blueberry Facial ($15 CAD value)!\n\n👇 **Select the Bath & Tidy package below to add directly to your cart:**`
-        : `🐾 **¡Sí, por supuesto! Contamos exactamente con nuestro servicio independiente de solo baño: "Bath & Tidy"!**\n\nNo estás obligado a contratar un corte completo si tu perro no lo necesita. Nuestro paquete **Bath & Tidy (Hidro-Baño & Aseo Esencial)** está diseñado exclusivamente para perritos que solo requieren baño profundo, deslanado e higiene **sin tocar el largo de su pelaje corporal**:\n\n✨ **¿Qué incluye el servicio Bath & Tidy?**\n• 🛁 **Hidrobaño tibio orgánico:** Con champú botánico hipoalergénico que nutre la piel.\n• 💨 **Secado 100% a mano sin jaulas:** Secado suave con turbina de velocidad gradual (jamás usamos jaulas).\n• 🐾 **Corte y limado de uñas con torno suave:** Redondeadas para no arañar suelos.\n• 👂 **Limpieza antiséptica de oídos y despeje higiénico de almohadillas.**\n• ❌ **No incluye:** Corte o perfilado de pelo corporal con máquina ni tijera.\n\n💵 **Tarifas transparentes según el peso de tu perrito:**\n• **Perros Pequeños (<20 lbs, ej. Shih Tzu, Pomeranian):** $105 CAD\n• **Perros Medianos (20–45 lbs, ej. Frenchie, Beagle):** $125 CAD\n• **Perros Grandes (45–75 lbs, ej. Golden Retriever, Labrador):** $155 CAD\n• **Perros Gigantes (76+ lbs, ej. Bernedoodle, Mastín):** $185 CAD\n\n🎁 **Beneficio de bienvenida:** Aplica el cupón **\`TORONTOFRESH15\`** para un **15% de descuento** en tu primera visita + un **Facial de Arándanos GRATIS** ($15 CAD).\n\n👇 **Agrega el servicio de solo baño directamente a tu carrito con 1 clic:**`,
-      actionItems: [
-        {
-          id: "pkg-bath-tidy-general",
-          name: "Bath & Tidy (Solo Baño & Higiene)",
-          price: 125,
-          category: "package",
-          icon: "🛁",
-          badge: "Sin Corte de Pelo",
-          highlights: "Hidrobaño tibio, secado a mano 100% sin jaulas, limado de uñas y oídos",
-        },
-        {
-          id: "pkg-blueberry-facial",
-          name: "Organic Blueberry Facial",
-          price: 15,
-          category: "addon",
-          icon: "🫐",
-          badge: "GRATIS con Cupón",
-          highlights: "Tratamiento facial de arándanos orgánico para manchas lagrimales",
-        },
-      ],
-    };
-  }
+  if (isBathOnlyInquiry) return bathOnlyReply(lang, entities);
 
   // 4. DIRECT SERVICE REQUEST: "I WANT A SERVICE" / "QUIERO UN SERVICIO" / "QUIERO CONTRATAR"
   const isServiceRequest =
     /want a service|need a service|get a service|hire a service|looking for a service|booking a service|quiero un servicio|necesito un servicio|quisiera un servicio|quiero contratar|deseo un servicio|busco un servicio|quiero contratar el|quiero un corte|quiero atender|interesa un servicio|interesado en un servicio|ich möchte einen service|je veux un service/i.test(s);
 
-  if (isServiceRequest) {
-    return {
-      text: lang === "en"
-        ? `🐾 **Wonderful decision! We would be delighted to pamper your pooch right at your doorstep.**\n\nThe Fresh Pooch brings our 100% cage-free luxury mobile spa trailer directly to your driveway across Toronto. Here are our main doorstep experiences:\n\n🛁 **1. Bath & Tidy ($105–$155 CAD):** Ideal if you only need a deep botanical bath, 100% cage-free hand blow-dry, nail buffing, ear cleansing, and de-shedding (no body haircut).\n\n✂️ **2. Premium Full Groom ($145–$185 CAD):** Our most popular service; includes warm bath, hand dry, and a **custom scissor breed haircut**.\n\n🌟 **3. The Ultimate Pooch Spa & Cut ($195–$235 CAD):** The royal treatment with deep de-shedding blowout, artisan scissor styling, winter salt paw balm, and Organic Blueberry Facial.\n\n🎁 **Welcome Privilege:** Use code **\`TORONTOFRESH15\`** for **15% OFF** your first appointment!\n\n👇 **Tap any package below to add it directly to your cart with 1 click:**`
-        : `🐾 **¡Excelente decisión! Estaremos encantados de consentir a tu perrito en la puerta de tu hogar.**\n\nLlevamos nuestra van de spa de lujo 100% libre de jaulas directo a tu entrada en Toronto. Aquí tienes nuestras 3 experiencias principales para que elijas la ideal para tu peludito:\n\n🛁 **1. Bath & Tidy ($105–$155 CAD):** Para un baño tibio relajante, secado a mano sin jaulas, cepillado, uñas y oídos (sin corte de pelo corporal).\n\n✂️ **2. Premium Full Groom ($145–$185 CAD):** Nuestro servicio estrella más vendido; incluye baño tibio, secado a mano y **corte completo estilizado** según la raza.\n\n🌟 **3. The Ultimate Pooch Spa & Cut ($195–$235 CAD):** La experiencia de lujo total con deslanado profundo, corte a tijera de autor, bálsamo para patas y Facial de Arándanos Orgánico.\n\n🎁 **Tu beneficio:** Aplica el cupón **\`TORONTOFRESH15\`** para recibir un **15% de descuento** en tu primera cita + Facial de Arándanos GRATIS.\n\n👇 **Toca cualquier opción abajo para agregarla a tu carrito en 1 clic:**`,
-      actionItems: [
-        {
-          id: "req-bath-tidy",
-          name: "Bath & Tidy (Solo Baño)",
-          price: 125,
-          category: "package",
-          icon: "🛁",
-          badge: "Sin Corte",
-          highlights: "Hidrobaño tibio, secado a mano sin jaulas, uñas y oídos",
-        },
-        {
-          id: "req-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "Más Vendido",
-          highlights: "Corte completo estilizado a tijera, hidrobaño tibio y limado de uñas",
-        },
-        {
-          id: "req-ultimate-spa",
-          name: "The Ultimate Pooch Spa & Cut",
-          price: 195,
-          category: "package",
-          icon: "✨",
-          badge: "Lujo Total",
-          highlights: "Deslanado profundo, corte de autor, Facial de Arándanos y Bálsamo",
-        },
-      ],
-    };
-  }
+  if (isServiceRequest) return serviceRequestReply(lang, entities);
 
   // 5. DIFFERENCE BETWEEN SERVICES: "DIFERENCIA ENTRE BAÑO Y CORTE"
   const isAskingDifference =
     /diferencia|difference|vs\b|cu[aá]l es mejor|which is better|distin|en qu[eé] se diferencia/i.test(s);
 
-  if (isAskingDifference) {
-    return {
-      text: lang === "en"
-        ? `Here is the clear distinction between our doorstep spa services:\n\n• 🛁 **Bath & Tidy:** Focuses 100% on hygiene and coat restoration. Includes warm botanical hydrobath, hand fluff dry, deep brush-out, nail buffing, and ear cleaning. **There is NO body clipper or scissor haircut.**\n\n• ✂️ **Premium Full Groom:** Includes everything in Bath & Tidy **PLUS a full custom scissor haircut & styling** (e.g., Teddy Bear cut, Breed Standard profile, sanitary trim).\n\n• 🌟 **The Ultimate Pooch Spa:** Adds intensive high-power undercoat de-shedding, organic winter paw salt balm, and our signature Blueberry Facial.\n\n👇 **Choose your preferred service to add to cart:**`
-        : `Aquí tienes la diferencia clara entre nuestras experiencias de spa:\n\n• 🛁 **Bath & Tidy:** Se enfoca 100% en higiene y salud del manto. Incluye hidrobaño tibio, secado a mano sin jaulas, deslanado, limado de uñas y oídos. **NO se corta el largo del pelo corporal.**\n\n• ✂️ **Premium Full Groom:** Incluye todo el Bath & Tidy **MÁS un corte de pelo completo estilizado** a tijera o máquina adaptado a la raza (ej. corte Teddy Bear, corte higiénico, perfilado).\n\n• 🌟 **The Ultimate Pooch Spa:** Agrega deslanado intensivo de alta potencia, bálsamo orgánico para patas contra la sal y Facial de Arándanos.\n\n👇 **Elige tu opción preferida para agregarla al carrito:**`,
-      actionItems: [
-        {
-          id: "diff-bath-tidy",
-          name: "Bath & Tidy (Solo Baño)",
-          price: 125,
-          category: "package",
-          icon: "🛁",
-          badge: "Sin Corte",
-          highlights: "Hidrobaño tibio, secado a mano sin jaulas, uñas y oídos",
-        },
-        {
-          id: "diff-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "Con Corte Completo",
-          highlights: "Corte completo de raza, baño y limado de uñas",
-        },
-      ],
-    };
-  }
+  if (isAskingDifference) return differenceReply(lang, entities);
 
   // 6. ALL SERVICES / FULL MENU
   const isAskingAllServices =
     /todos los servicios|qu[eé] servicios|qu[eé] ofrecen|all services|what services|full menu|catalog|servicios tienen|cu[aá]les son sus servicios/i.test(s);
 
-  if (isAskingAllServices) {
-    return {
-      text: lang === "en"
-        ? `Here is our complete Toronto mobile dog spa menu:\n\n1️⃣ 🛁 **Bath & Tidy ($105–$155 CAD):** Essential hygiene without haircut.\n2️⃣ ✂️ **Premium Full Groom ($145–$185 CAD):** Custom breed scissor styling + bath & nails.\n3️⃣ 🌟 **The Ultimate Pooch Spa & Cut ($195–$235 CAD):** Deep de-shedding, scissor haircut, Blueberry Facial & paw balm.\n4️⃣ 🫐 **Add-ons:** Organic Blueberry Facial ($15), Winter Paw Balm ($12), Enzymatic Teeth Brushing ($15).\n\n🎁 **Code:** **\`TORONTOFRESH15\`** gets you **15% OFF**!\n\n👇 **Add any package below directly to your cart:**`
-        : `Aquí tienes nuestro menú completo de spa canino móvil en Toronto:\n\n1️⃣ 🛁 **Bath & Tidy ($105–$155 CAD):** Higiene esencial y baño profundo sin corte de pelo.\n2️⃣ ✂️ **Premium Full Groom ($145–$185 CAD):** Corte completo de raza a tijera, hidrobaño y uñas.\n3️⃣ 🌟 **The Ultimate Pooch Spa & Cut ($195–$235 CAD):** Deslanado intensivo, corte de autor, Facial de Arándanos y bálsamo.\n4️⃣ 🫐 **Tratamientos Extra:** Facial de Arándanos ($15), Bálsamo de Patas ($12), Cepillado Dental ($15).\n\n🎁 **Cupón:** **\`TORONTOFRESH15\`** para un **15% de descuento**.\n\n👇 **Agrega cualquier opción abajo directamente al carrito:**`,
-      actionItems: [
-        {
-          id: "menu-bath-tidy",
-          name: "Bath & Tidy",
-          price: 125,
-          category: "package",
-          icon: "🛁",
-          badge: "Higiene Esencial",
-          highlights: "Hidrobaño tibio, secado a mano, uñas y oídos",
-        },
-        {
-          id: "menu-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "Corte Completo",
-          highlights: "Corte estilizado a tijera, hidrobaño y uñas",
-        },
-        {
-          id: "menu-ultimate-spa",
-          name: "The Ultimate Pooch Spa & Cut",
-          price: 195,
-          category: "package",
-          icon: "✨",
-          badge: "Lujo Total",
-          highlights: "Deslanado profundo, corte, facial y bálsamo",
-        },
-      ],
-    };
-  }
+  if (isAskingAllServices) return menuReply(lang, entities);
 
   // 7. CAGE-FREE PHILOSOPHY / ZERO CAGES
   const isAskingCages = /jaula|jaulas|cage|cages|sin jaula|cage free|enjaul/i.test(s);
@@ -741,24 +463,7 @@ function generateAgentReply(
   // 13. DISCOUNTS / PROMOTIONS
   const isAskingDiscount =
     /descuento|promocion|promoción|promo|oferta|codigo|código|cup[oó]n|discount|coupon|special offer/i.test(s);
-  if (isAskingDiscount) {
-    return {
-      text: lang === "en"
-        ? `🎁 **Active Toronto Promotion:**\nUse coupon code **\`TORONTOFRESH15\`** to receive **15% OFF** your first appointment + a **FREE Organic Blueberry Facial** ($15 CAD value)! Simply enter the code at checkout or tap any service card below to apply it automatically.`
-        : `🎁 **Promoción activa en Toronto:**\nAplica el código **\`TORONTOFRESH15\`** para obtener un **15% de descuento** en tu primera cita + un **Facial de Arándanos Orgánico GRATIS** ($15 CAD de valor). Puedes aplicarlo al pagar o tocar cualquier tarjeta de abajo para añadirlo a tu carrito.`,
-      actionItems: [
-        {
-          id: "disc-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "15% OFF con Cupón",
-          highlights: "Corte completo de raza, hidrobaño tibio y limado de uñas",
-        },
-      ],
-    };
-  }
+  if (isAskingDiscount) return discountReply(lang, entities);
 
   // 14. TWO DOGS / MULTI-PET SIBLING DISCOUNT
   const isAskingMultipleDogs =
@@ -812,129 +517,8 @@ function generateAgentReply(
 
   // The breed may come from an earlier message, but the request for a quote must be in this one;
   // otherwise every later question ("Hola", "which areas?") repeated the previous quote.
-  // Giant breeds have no dedicated quote card; they get the general table below, which lists the giant tier.
-  if (
-    entities.breed &&
-    entities.breedTier !== "giant" &&
-    (isAskingPrice || currentEntities.isBathOnly || currentEntities.isFullGroom)
-  ) {
-    const breedName = entities.breed;
-    const locTextEn = entities.location ? `in **${entities.location}**` : "in Toronto";
-    const locTextEs = entities.location ? `en **${entities.location}**` : "en Toronto";
-
-    let scheduleNoteEn = "Our mobile spa visits Downtown Toronto (King West route) every **Monday**.";
-    let scheduleNoteEs = "Nuestro spa móvil visita Downtown Toronto (ruta de King West) todos los **lunes**.";
-    if (entities.location === "Midtown Toronto") {
-      scheduleNoteEn = "Our mobile spa trailer is in Midtown every **Wednesday**.";
-      scheduleNoteEs = "Nuestro spa móvil está en Midtown todos los **miércoles**.";
-    }
-
-    if (entities.breedTier === "large") {
-      return {
-        text: lang === "en"
-          ? `🐾 **Exact Quote for your ${breedName} ${locTextEn}:**\n\n${breedName}s (typically 55–75 lbs) feature a heavy double coat that thrives with our warm hydro-bath and de-shedding treatment:\n\n• 🛁 **Hydro-Bath & De-Shedding (Bath & Tidy):** **$155–$175 CAD**\n  *Includes:* Warm organic hydrobath with blueberry wash, high-velocity undercoat blowout (100% cage-free hand-drying), thorough brush-out of dead fur, nail clipping & dremel buffing, antiseptic ear cleansing, and pad tidy.\n\n• ✂️ **The Ultimate Pooch Spa & Scissor Styling:** **$195–$225 CAD**\n  *Includes:* Everything in Hydro-Bath plus full hand scissor outline, leg feather trimming, tail shaping, sanitary hygiene trim, and organic winter paw salt balm.\n\n📍 **Neighborhood Schedule:** ${scheduleNoteEn}\n\n🎁 **Welcome Privilege:** Use code **\`TORONTOFRESH15\`** for **15% OFF** + Free Blueberry Facial!\n\n👇 **Add your service to cart with 1 click below:**`
-          : `🐾 **Cotización exacta para tu ${breedName} ${locTextEs}:**\n\nLos ${breedName} son perros grandes (típicamente 55–75 lbs) con manto denso que agradece enormemente el hidro-baño y deslanado:\n\n• 🛁 **Hidro-Baño & Deslanado Profundo (Solo Baño & Higiene):** **$155–$175 CAD**\n  *Incluye:* Hidrobaño tibio orgánico, deslanado de alta potencia para retirar todo el pelo muerto suelto, secado suave a mano 100% sin jaulas, corte y limado de uñas, limpieza antiséptica de oídos y arreglo de almohadillas.\n\n• ✂️ **The Ultimate Pooch Spa & Corte:** **$195–$225 CAD**\n  *Incluye:* Todo el baño y deslanado más perfilado a tijera de plumas en patas, pecho y cola, corte higiénico y bálsamo orgánico para patas contra la sal de aceras.\n\n📍 **Ruta en tu zona:** ${scheduleNoteEs}\n\n🎁 **Beneficio de bienvenida:** Aplica el cupón **\`TORONTOFRESH15\`** para obtener **15% de descuento** en tu primera cita + un **Facial de Arándanos Orgánico GRATIS** ($15 CAD).\n\n👇 **Agrega el servicio directamente a tu carrito con 1 clic:**`,
-        actionItems: [
-          {
-            id: `bath-shed-${breedName.toLowerCase().replace(/\s+/g, "-")}`,
-            name: `Hydro-Bath & De-Shedding (${breedName})`,
-            price: 155,
-            category: "package",
-            icon: "🛁",
-            badge: "Recomendado para Manto",
-            highlights: "Hidrobaño tibio, deslanado profundo, oídos y limado de uñas",
-            breed: breedName,
-          },
-          {
-            id: `ultimate-spa-${breedName.toLowerCase().replace(/\s+/g, "-")}`,
-            name: `The Ultimate Pooch Spa & Cut (${breedName})`,
-            price: 195,
-            category: "package",
-            icon: "✨",
-            badge: "Lujo Total",
-            highlights: "Perfilado a tijera, Facial de Arándanos y Bálsamo de Patas",
-            breed: breedName,
-          },
-          {
-            id: "blueberry-facial-addon",
-            name: "Organic Blueberry Facial",
-            price: 15,
-            category: "addon",
-            icon: "🫐",
-            badge: "GRATIS con Cupón",
-            highlights: "Limpieza facial de lágrimas y fragancia botánica",
-          },
-        ],
-      };
-    }
-
-    if (entities.breedTier === "small") {
-      return {
-        text: lang === "en"
-          ? `🐾 **Exact Quote for your ${breedName} ${locTextEn}:**\n\nSmall pups (<20 lbs) receive our gentle 1-on-1 hand care:\n\n• 🛁 **Bath & Tidy Express:** **$105–$125 CAD**\n• ✂️ **The Ultimate Pooch Spa & Full Scissor Cut:** **$135–$155 CAD**\n\n🎁 **Welcome Privilege:** Use code **\`TORONTOFRESH15\`** for **15% OFF**!\n\n👇 **Choose your service below to add to cart:**`
-          : `🐾 **Cotización exacta para tu ${breedName} ${locTextEs}:**\n\nPara perritos pequeños (<20 lbs):\n\n• 🛁 **Bath & Tidy (Baño & Arreglo Express):** **$105–$125 CAD**\n• ✂️ **The Ultimate Pooch Spa & Corte Completo:** **$135–$155 CAD**\n\n🎁 **Beneficio de bienvenida:** Cupón **\`TORONTOFRESH15\`** con **15% de descuento**.\n\n👇 **Elige tu servicio para agregarlo al carrito:**`,
-        actionItems: [
-          {
-            id: `bath-tidy-${breedName.toLowerCase().replace(/\s+/g, "-")}`,
-            name: `Bath & Tidy Express (${breedName})`,
-            price: 105,
-            category: "package",
-            icon: "🛁",
-            badge: "Express Care",
-            highlights: "Gentle organic wash, tear-stain facial, nail buff",
-            breed: breedName,
-          },
-          {
-            id: `ultimate-spa-${breedName.toLowerCase().replace(/\s+/g, "-")}`,
-            name: `The Ultimate Pooch Spa & Cut (${breedName})`,
-            price: 135,
-            category: "package",
-            icon: "✂️",
-            badge: "Full Scissor Cut",
-            highlights: "Artisan haircut, warm hydrobath & organic paw balm",
-            breed: breedName,
-          },
-        ],
-      };
-    }
-
-    // Medium breeds default
-    return {
-      text: lang === "en"
-        ? `🐾 **Exact Quote for your ${breedName} ${locTextEn}:**\n\nMedium pups (20–45 lbs) receive our dedicated 1-on-1 session:\n\n• 🛁 **Bath & Tidy:** **$125–$145 CAD**\n• ✂️ **Premium Full Groom & Scissor Cut:** **$155–$185 CAD**\n\n🎁 **Welcome Privilege:** Code **\`TORONTOFRESH15\`** gives **15% OFF** + Free Blueberry Facial!\n\n👇 **Add directly to cart below:**`
-        : `🐾 **Cotización exacta para tu ${breedName} ${locTextEs}:**\n\nPara perros medianos (20–45 lbs):\n\n• 🛁 **Bath & Tidy:** **$125–$145 CAD**\n• ✂️ **Premium Full Groom & Corte Completo:** **$155–$185 CAD**\n\n🎁 **Beneficio de bienvenida:** Cupón **\`TORONTOFRESH15\`** para un **15% de descuento**.\n\n👇 **Agrega el servicio directamente a tu carrito:**`,
-      actionItems: [
-        {
-          id: `bath-tidy-${breedName.toLowerCase().replace(/\s+/g, "-")}`,
-          name: `Bath & Tidy (${breedName})`,
-          price: 125,
-          category: "package",
-          icon: "🛁",
-          badge: "Essential",
-          highlights: "Warm hydrobath, hand fluff dry, ear & pad tidy",
-          breed: breedName,
-        },
-        {
-          id: `full-groom-${breedName.toLowerCase().replace(/\s+/g, "-")}`,
-          name: `Premium Full Groom & Cut (${breedName})`,
-          price: 155,
-          category: "package",
-          icon: "✂️",
-          badge: "Most Popular",
-          highlights: "Custom scissor haircut (Teddy Bear), warm hydrobath",
-          breed: breedName,
-        },
-        {
-          id: "paw-balm-addon",
-          name: "Winter Road Salt Paw Balm",
-          price: 12,
-          category: "addon",
-          icon: "🐾",
-          badge: "Winter Essential",
-          highlights: "Organic beeswax barrier against sidewalk salt",
-        },
-      ],
-    };
+  if (entities.breed && (isAskingPrice || currentEntities.isBathOnly || currentEntities.isFullGroom)) {
+    return quoteReply(lang, entities);
   }
 
   // 18b. SERVICE AREAS & ROUTE DAYS (same route days as the owner dashboard zones)
@@ -951,9 +535,9 @@ function generateAgentReply(
     };
     const day = entities.location ? routeDays[entities.location] : undefined;
     const tableEn =
-      "• **King West / Downtown:** Mondays\n• **The Annex:** Tuesdays\n• **Midtown:** Wednesdays\n• **Rosedale:** Thursdays\n• **Christie Pits:** Fridays\n• **The Beaches:** Saturdays";
+      "• **King West / Downtown:** Mondays\n• **The Annex:** Tuesdays\n• **Midtown:** Wednesdays\n• **Rosedale:** Thursdays\n• **Christie Pits:** Fridays\n• **The Beaches:** Saturdays\n• **Leaside:** Sundays";
     const tableEs =
-      "• **King West / Downtown:** lunes\n• **The Annex:** martes\n• **Midtown:** miércoles\n• **Rosedale:** jueves\n• **Christie Pits:** viernes\n• **The Beaches:** sábados";
+      "• **King West / Downtown:** lunes\n• **The Annex:** martes\n• **Midtown:** miércoles\n• **Rosedale:** jueves\n• **Christie Pits:** viernes\n• **The Beaches:** sábados\n• **Leaside:** domingos";
 
     if (day) {
       return {
@@ -979,95 +563,21 @@ function generateAgentReply(
   }
 
   // 19. GENERAL PRICING QUERY
-  if (isAskingPrice) {
-    return {
-      text: lang === "en"
-        ? `Here is our transparent, all-inclusive pricing by weight tier across Toronto:\n\n• **Small Pups (<20 lbs):** $120–$140 CAD (or $105 CAD for Bath & Tidy).\n• **Medium Pups (20–45 lbs):** $145–$185 CAD (or $125 CAD for Bath & Tidy).\n• **Large Pups (45–75 lbs):** $185–$225 CAD (or $155 CAD for Bath & Tidy).\n• **Giant Pups (76+ lbs):** $215–$260 CAD.\n\n✨ **Every appointment includes:** Warm botanical hydrobath, gentle hand blow-dry (zero cages), custom scissor styling, nail clipping & buffing, ear cleansing, and an Organic Blueberry Facial.\n\n🎁 **Welcome Code:** **\`TORONTOFRESH15\`** for **15% OFF**!\n\n👇 **Select a package to start your cart:**`
-        : `Nuestras tarifas transparentes todo incluido según el tamaño de tu perro en Toronto:\n\n• **Perros Pequeños (<20 lbs):** $120–$140 CAD (o $105 CAD solo Bath & Tidy).\n• **Perros Medianos (20–45 lbs):** $145–$185 CAD (o $125 CAD solo Bath & Tidy).\n• **Perros Grandes (45–75 lbs):** $185–$225 CAD (o $155 CAD solo baño y deslanado).\n• **Perros Gigantes (76+ lbs):** $215–$260 CAD.\n\n✨ **Todo incluido frente a tu puerta:** Hidrobaño tibio orgánico, secado suave a mano 100% sin jaulas, corte estilizado a tijera, corte y limado de uñas, limpieza de oídos y arreglo higiénico.\n\n🎁 **Cupón:** **\`TORONTOFRESH15\`** para **15% de descuento**.\n\n👇 **Selecciona un servicio para agregarlo al carrito:**`,
-      actionItems: [
-        {
-          id: "pkg-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "Most Popular",
-          highlights: "Custom scissor styling, warm hydrobath, ear & nail care",
-        },
-        {
-          id: "pkg-ultimate-spa",
-          name: "The Ultimate Pooch Spa & Cut",
-          price: 195,
-          category: "package",
-          icon: "✨",
-          badge: "Royal Luxury",
-          highlights: "De-shedding blowout, scissor haircut & Blueberry Facial",
-        },
-      ],
-    };
-  }
+  if (isAskingPrice) return priceTableReply(lang);
 
   // 20. BOOKING INTENT
   if (
     s.includes("agend") || s.includes("reserv") || s.includes("contrat") || s.includes("cita") ||
     s.includes("turno") || s.includes("book") || s.includes("schedul") || s.includes("appointment")
   ) {
-    return {
-      text: lang === "en"
-        ? `🐾 **I'd love to get your pooch scheduled right away!** Booking our luxury mobile van takes under 60 seconds:\n\n1️⃣ **Choose your package:** Tap an option below to add to your cart.\n2️⃣ **Your location:** We service Midtown (Wednesdays), The Annex (Tuesdays), Rosedale (Thursdays), Downtown (Mondays), and all Toronto neighborhoods.\n\n🎁 **Welcome Privilege:** Use code **\`TORONTOFRESH15\`** for **15% OFF** + Free Organic Blueberry Facial!\n\n👇 **Click to add to cart and proceed to instant checkout:**`
-        : `🐾 **¡Será un verdadero placer consentir a tu perrito!** Agendar tu cita de spa móvil en Toronto es súper rápido y 100% digital:\n\n1️⃣ **Elige tu experiencia:** Toca una opción abajo para agregar a tu carrito.\n2️⃣ **Tu zona:** Atendemos Midtown (miércoles), The Annex (martes), Rosedale (jueves), Downtown (lunes), Beaches (sábados) y todo el GTA.\n\n🎁 **Beneficio de bienvenida:** Aplica el cupón **\`TORONTOFRESH15\`** para **15% de descuento** + Facial de Arándanos GRATIS.\n\n👇 **Toca para agregar a tu carrito y completar el pago:**`,
-      actionItems: [
-        {
-          id: "book-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "Full Care",
-          highlights: "Custom breed haircut, warm hydrobath, nail buffing",
-        },
-        {
-          id: "book-ultimate-spa",
-          name: "The Ultimate Pooch Spa & Cut",
-          price: 195,
-          category: "package",
-          icon: "✨",
-          badge: "Best Overall",
-          highlights: "Royal treatment with de-shedding & organic facial",
-        },
-      ],
-    };
+    return bookingReply(lang, entities);
   }
 
   // 21. BEST SERVICE RECOMMENDATION
   if (
     s.includes("mejor") || s.includes("recomiend") || s.includes("best") || s.includes("recommend")
   ) {
-    return {
-      text: lang === "en"
-        ? `For the absolute finest, stress-free pampering in Toronto, here is our top recommendation:\n\n🌟 **1. The Ultimate Pooch Spa & Cut ($195–$235 CAD):** The royal treatment: warm hydrobath, de-shedding blowout, custom scissor styling, paw balm, and Blueberry Facial.\n\n✂️ **2. Premium Full Groom ($145–$185 CAD):** Our most popular service: custom haircut, bath, ear cleansing, and nail buffing.\n\n👇 **Add your favorite package directly to cart:**`
-        : `¡Para que tu perrito viva una experiencia de spa inolvidable sin una gota de estrés, te recomendamos:\n\n🌟 **1. The Ultimate Pooch Spa & Cut ($195–$235 CAD):** El tratamiento estrella con deslanado profundo, corte a tijera de autor, bálsamo para patas y Facial de Arándanos.\n\n✂️ **2. Premium Full Groom ($145–$185 CAD):** Nuestro servicio más vendido con corte completo, hidrobaño tibio y limado de uñas.\n\n👇 **Agrega tu paquete preferido directamente al carrito:**`,
-      actionItems: [
-        {
-          id: "rec-ultimate-spa",
-          name: "The Ultimate Pooch Spa & Cut",
-          price: 195,
-          category: "package",
-          icon: "✨",
-          badge: "Best Overall",
-          highlights: "De-shedding + scissor styling, Blueberry Facial & Paw Balm",
-        },
-        {
-          id: "rec-full-groom",
-          name: "Premium Full Groom",
-          price: 145,
-          category: "package",
-          icon: "✂️",
-          badge: "Most Popular",
-          highlights: "Custom breed haircut, warm hydrobath, nail buffing",
-        },
-      ],
-    };
+    return bestServiceReply(lang, entities);
   }
 
   // 22. COURTEOUS GREETINGS & TIME-OF-DAY SALUTATIONS (when standalone)
@@ -1148,7 +658,7 @@ function generateAgentReply(
 
   const idx = turnCount % 3;
   return {
-    text: lang === "en" ? fallbackVariationsEn[idx] : fallbackVariationsEs[idx],
+    text: (lang === "en" ? fallbackVariationsEn[idx] : fallbackVariationsEs[idx])!,
   };
 }
 
@@ -1197,80 +707,22 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
   const [checkoutAddress, setCheckoutAddress] = useState("142 Bloor St W, Toronto, ON");
   const [checkoutDogName, setCheckoutDogName] = useState("Milo");
 
-  // Gemini AI Brain Configuration State
+  // Live AI runs only when the server has a Gemini key (GEMINI_API_KEY); the browser never sees it.
   const [showAiConfig, setShowAiConfig] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("fp_gemini_api_key") || "";
-  });
-  const [hasActiveGeminiKey, setHasActiveGeminiKey] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("fp_gemini_api_key");
-  });
-  const [keyTestStatus, setKeyTestStatus] = useState<string | null>(null);
-  const [testingKey, setTestingKey] = useState(false);
-
-  const handleSaveApiKey = () => {
-    const trimmed = apiKeyInput.trim();
-    if (!trimmed) {
-      localStorage.removeItem("fp_gemini_api_key");
-      setHasActiveGeminiKey(false);
-      setKeyTestStatus("Cleared key. Operating with built-in neural concierge.");
-      return;
-    }
-    localStorage.setItem("fp_gemini_api_key", trimmed);
-    setHasActiveGeminiKey(true);
-    setKeyTestStatus("Saved! Qimmiq will now route queries to live Google Gemini 2.0 Flash.");
-    setTimeout(() => setKeyTestStatus(null), 4000);
-  };
-
-  const handleClearApiKey = () => {
-    localStorage.removeItem("fp_gemini_api_key");
-    setApiKeyInput("");
-    setHasActiveGeminiKey(false);
-    setKeyTestStatus("API Key removed. Switched back to built-in concierge.");
-    setTimeout(() => setKeyTestStatus(null), 3000);
-  };
-
-  const handleTestApiKey = async () => {
-    const key = apiKeyInput.trim();
-    if (!key) {
-      setKeyTestStatus("Please paste a Gemini API Key first.");
-      return;
-    }
-    setTestingKey(true);
-    setKeyTestStatus("Testing connection to Google Gemini 2.0 Flash...");
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: "Say 'OK' in 1 word." }] }],
-          }),
-        }
-      );
-      if (res.ok) {
-        setKeyTestStatus("✅ Connected successfully to Google Gemini 2.0 Flash!");
-        localStorage.setItem("fp_gemini_api_key", key);
-        setHasActiveGeminiKey(true);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        setKeyTestStatus(`⚠️ Key Error: ${errData.error?.message || "Invalid API Key"}`);
-      }
-    } catch (e: any) {
-      setKeyTestStatus(`Connection error: ${e.message}`);
-    } finally {
-      setTestingKey(false);
-    }
-  };
+  const [aiConfigured, setAiConfigured] = useState(false);
+  useEffect(() => {
+    fetch("/api/qimmiq/status")
+      .then((r) => (r.ok ? r.json() : { configured: false }))
+      .then((d: { configured?: boolean }) => setAiConfigured(Boolean(d.configured)))
+      .catch(() => setAiConfigured(false));
+  }, []);
+  const { appointments } = useAppointments();
 
   const [msgs, setMsgs] = useState<Msg[]>([
     {
       from: "ai",
       text: isAdmin
-        ? "👨‍💼 Operations Director Mode active. I can report on today's revenue ($860 CAD), Van #1 freshwater (72%), active Latchkey codes, and route density. ⚡"
+        ? "👨‍💼 Operations Copilot ready. Ask me about today's route, revenue and bookings, Latchkey codes or vaccine records. ⚡"
         : "Woof! 🐾 I'm Qimmiq, your Toronto Mobile Dog Spa Concierge. How may I pamper your pooch today? (I speak English & Español!)",
     },
   ]);
@@ -1286,7 +738,7 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
       {
         from: "ai",
         text: isAdmin
-          ? "👨‍💼 Operations Director Mode active. I can report on today's revenue ($860 CAD), Van #1 freshwater (72%), active Latchkey codes, and route density. ⚡"
+          ? "👨‍💼 Operations Copilot ready. Ask me about today's route, revenue and bookings, Latchkey codes or vaccine records. ⚡"
           : "Woof! 🐾 I'm Qimmiq, your Toronto Mobile Dog Spa Concierge. How may I pamper your pooch today? (I speak English & Español!)",
       },
     ]);
@@ -1310,8 +762,26 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
   const discount15 = rawSubtotal * 0.15;
   const finalTotal = Math.max(0, rawSubtotal - discount15);
 
-  const handleCompleteOrder = () => {
-    recordRealCompletedGroom();
+  const handleCompleteOrder = async () => {
+    const packages = cart.filter((i) => i.category === "package");
+    const date = addDays(torontoToday(), 1);
+    for (const item of packages) {
+      const service: ServiceId = SERVICE_IDS.find((id) => item.name.startsWith(SERVICES[id].name)) ?? (/bath/i.test(item.name) ? "tidy" : /ultimate/i.test(item.name) ? "ultimate" : "full");
+      await createAppointment({
+        petName: checkoutDogName,
+        breed: item.breed ?? "",
+        weightLbs: 32,
+        service,
+        total: Math.round(item.price * 0.85),
+        date,
+        time: "8:30 AM",
+        timeWindow: "To be confirmed",
+        address: checkoutAddress,
+        paymentMethod,
+        status: "requested",
+        source: "web",
+      }).catch(() => undefined);
+    }
     setCheckoutStep("success");
     setTimeout(() => {
       setCart([]);
@@ -1364,32 +834,25 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
     setTurnCount(newTurn);
 
     const extracted = extractEntities(t);
-    lastEntitiesRef.current = {
-      breed: extracted.breed || lastEntitiesRef.current.breed,
-      breedTier: extracted.breedTier || lastEntitiesRef.current.breedTier,
-      location: extracted.location || lastEntitiesRef.current.location,
-      isBathOnly: extracted.isBathOnly !== undefined ? extracted.isBathOnly : lastEntitiesRef.current.isBathOnly,
-      isFullGroom: extracted.isFullGroom !== undefined ? extracted.isFullGroom : lastEntitiesRef.current.isFullGroom,
-    };
+    lastEntitiesRef.current = mergeEntities(extracted, lastEntitiesRef.current);
 
-    // 1. Try Live Google Gemini 2.0 Flash if API key is provided
-    const activeApiKey = typeof window !== "undefined" ? localStorage.getItem("fp_gemini_api_key") || "" : "";
-    if (activeApiKey) {
+    // 1. Live AI through the server when it has a Gemini key (client questions only; owner data stays local)
+    if (aiConfigured && activeMode === "client") {
       try {
-        const geminiResult = await callGeminiLive(t, msgs, lastEntitiesRef.current, detectedLang, activeApiKey);
+        const geminiResult = await callGeminiLive(t, msgs, lastEntitiesRef.current);
         if (geminiResult && geminiResult.text) {
-          setMsgs((m) => [...m, { from: "ai", text: geminiResult.text, actionItems: geminiResult.actionItems }]);
+          setMsgs((m) => [...m, { from: "ai", text: geminiResult.text, ...(geminiResult.actionItems ? { actionItems: geminiResult.actionItems } : {}) }]);
           setTyping(false);
           return;
         }
       } catch (err) {
-        console.warn("Live Gemini request failed, using local brain:", err);
+        console.warn("Live AI request failed, using the built-in engine:", err);
       }
     }
 
     // 2. High-intelligence local conversational engine with full intent recognition & action items
-    const generated = generateAgentReply(t, activeMode, detectedLang, newTurn, lastEntitiesRef.current);
-    setMsgs((m) => [...m, { from: "ai", text: generated.text, actionItems: generated.actionItems }]);
+    const generated = generateAgentReply(t, activeMode, detectedLang, newTurn, lastEntitiesRef.current, appointments);
+    setMsgs((m) => [...m, { from: "ai", text: generated.text, ...(generated.actionItems ? { actionItems: generated.actionItems } : {}) }]);
     setTyping(false);
   };
 
@@ -1505,16 +968,16 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setShowAiConfig(!showAiConfig)}
-                title="AI Engine Settings (Google Gemini 2.0 Flash / Built-in Brain)"
+                title="Which AI engine Qimmiq is using"
                 className={cn(
                   "flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition shadow-sm",
-                  hasActiveGeminiKey
+                  aiConfigured
                     ? "bg-emerald-500/25 text-emerald-200 border border-emerald-400/40"
                     : "bg-primary-foreground/15 text-primary-foreground/90 hover:bg-primary-foreground/25"
                 )}
               >
                 <Cpu className="h-3 w-3" />
-                <span>{hasActiveGeminiKey ? "Gemini Live" : "AI Brain"}</span>
+                <span>{aiConfigured ? "Live AI" : "AI Brain"}</span>
               </button>
               {cart.length > 0 && (
                 <button
@@ -1553,91 +1016,23 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
           )}
         </div>
 
-        {/* AI Brain Configuration Drawer Panel */}
+        {/* AI engine info (the key is configured on the server, never here) */}
         {showAiConfig && (
           <div className="border-b border-gold/40 bg-card p-4 text-xs shadow-md animate-fade-down z-20">
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-bold text-foreground flex items-center gap-1.5 font-serif text-sm">
                 <Cpu className="h-4 w-4 text-gold" />
-                Qimmiq AI Brain Engine
+                Qimmiq AI Engine
               </span>
-              <button
-                onClick={() => setShowAiConfig(false)}
-                className="text-muted-foreground hover:text-foreground text-xs p-1"
-              >
+              <button onClick={() => setShowAiConfig(false)} className="text-muted-foreground hover:text-foreground text-xs p-1" aria-label="Close AI info">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
-              Qimmiq cuenta con nuestro motor conversacional de spa móvil en Toronto. Puedes conectar <strong>Google Gemini 2.0 Flash</strong> en vivo para razonamiento autónomo profundo y lenguaje ultra-natural.
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {aiConfigured
+                ? "Live AI is on: client questions are answered by Google Gemini through our server, using our official price list."
+                : "Qimmiq is using its built-in concierge engine. Live AI turns on when the business adds a Gemini key on the server."}
             </p>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block">
-                Google Gemini API Key (Opcional)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Pega tu clave AIzaSy... de Google AI Studio"
-                  className="flex-1 rounded-xl border border-input bg-background px-3 py-1.5 text-xs outline-none focus:border-gold shadow-sm font-mono"
-                />
-                <button
-                  onClick={handleSaveApiKey}
-                  className="rounded-xl bg-gold px-3.5 py-1.5 text-xs font-bold text-ink hover:scale-105 transition shadow-sm"
-                >
-                  Guardar
-                </button>
-                {hasActiveGeminiKey && (
-                  <button
-                    onClick={handleClearApiKey}
-                    className="rounded-xl border border-border px-2.5 py-1.5 text-xs text-muted-foreground hover:text-destructive transition"
-                    title="Borrar clave"
-                  >
-                    Borrar
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  onClick={handleTestApiKey}
-                  disabled={testingKey}
-                  className="text-[10px] text-teal font-bold hover:underline flex items-center gap-1"
-                >
-                  <RefreshCw className={cn("h-3 w-3", testingKey && "animate-spin")} />
-                  {testingKey ? "Probando conexión..." : "Probar Conexión Gemini"}
-                </button>
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 underline"
-                >
-                  Obtener Clave Gratis en Google AI Studio <ExternalLink className="h-2.5 w-2.5" />
-                </a>
-              </div>
-
-              {keyTestStatus && (
-                <div className="mt-2 rounded-xl bg-muted/60 border border-border p-2 text-[11px] font-medium text-foreground">
-                  {keyTestStatus}
-                </div>
-              )}
-
-              <div className="pt-1 flex items-center justify-between border-t border-border/50 text-[10px]">
-                <span className="text-muted-foreground">Estado Actual:</span>
-                <span className={cn(
-                  "font-bold px-2 py-0.5 rounded-full",
-                  hasActiveGeminiKey
-                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                    : "bg-blue-500/15 text-blue-600 dark:text-blue-400"
-                )}>
-                  {hasActiveGeminiKey ? "🟢 Live Google Gemini 2.0 Flash Activo" : "🔵 Concierge Neuronal Local Activo"}
-                </span>
-              </div>
-            </div>
           </div>
         )}
 
@@ -2015,7 +1410,7 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
                   onClick={handleCompleteOrder}
                   className="w-full mt-3 rounded-full bg-gradient-gold py-3 text-sm font-extrabold text-ink shadow-lift transition hover:scale-[1.02] active:scale-95 disabled:opacity-50"
                 >
-                  Confirm Booking & Pay ${finalTotal.toFixed(2)} CAD ➔
+                  Request Booking · ${finalTotal.toFixed(2)} CAD ➔
                 </button>
               </div>
             ) : (
@@ -2025,22 +1420,22 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
                   <Check className="h-8 w-8" />
                 </div>
                 <div>
-                  <h3 className="font-serif text-2xl font-bold">Booking Confirmed! 🐾</h3>
+                  <h3 className="font-serif text-2xl font-bold">Booking requested! 🐾</h3>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                    Your luxury mobile spa trailer is reserved for <strong>{checkoutDogName}</strong> at <strong>{checkoutAddress}</strong>.
+                    We received your request for <strong>{checkoutDogName}</strong> at <strong>{checkoutAddress}</strong>. Our team will confirm the exact route time.
                   </p>
                 </div>
 
                 <div className="rounded-2xl border border-border bg-muted/30 p-4 text-xs space-y-1.5 text-left max-w-sm mx-auto">
                   <div className="flex justify-between font-mono text-[11px] text-teal">
-                    <span>Digital Passport #FP-9942</span>
-                    <span>PAID · ${finalTotal.toFixed(2)} CAD</span>
+                    <span>Estimated total</span>
+                    <span>${finalTotal.toFixed(2)} CAD · pay after the groom</span>
                   </div>
                   <div className="text-muted-foreground">
                     Method: {paymentMethod.toUpperCase()} · 100% Cage-Free Guaranteed
                   </div>
                   <div className="text-[11px] text-foreground font-semibold">
-                    A digital arrival alert will be sent 15 minutes before the spa van reaches your doorstep.
+                    You will get the confirmed time before your visit. Nothing has been charged.
                   </div>
                 </div>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   TrendingUp, CalendarDays, DollarSign, Users, Truck, Star, ArrowUpRight, ArrowDownRight, MapPin, Fuel, Wrench,
   KeyRound, LogOut, ShieldCheck, Key, AlertCircle, User,
@@ -6,32 +6,16 @@ import {
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
 import { AdminTools } from "./AdminTools";
+import { formatDate, serviceName, torontoToday, useAppointments } from "@/lib/appointments";
+import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "@/lib/dashboard-stats";
+import { getStaffConfig, looksLikeStaffEmail, staffDemoLogin, staffLogin, staffLogout, type StaffConfig } from "@/lib/staff-session";
 
-const KPIS = [
-  { label: "Revenue (Nov)", value: "$21,280", delta: "+15.8%", up: true, icon: DollarSign },
-  { label: "Grooms Completed", value: "138", delta: "+12.2%", up: true, icon: CalendarDays },
-  { label: "Active VIP Members", value: "54", delta: "+8 this month", up: true, icon: Users },
-  { label: "Avg. Google Rating", value: "4.9", delta: "312 reviews", up: true, icon: Star },
-];
+// Not tracked by the appointment store yet: sample figures for the demo.
+const SAMPLE_VIP_MEMBERS = { value: "54", delta: "+8 this month" };
+const SAMPLE_RATING = { value: "4.9", delta: "312 reviews" };
 
-const WEEK = [
-  { day: "Mon", grooms: 4, rev: 620 },
-  { day: "Tue", grooms: 5, rev: 780 },
-  { day: "Wed", grooms: 5, rev: 815 },
-  { day: "Thu", grooms: 3, rev: 470 },
-  { day: "Fri", grooms: 6, rev: 940 },
-  { day: "Sat", grooms: 6, rev: 990 },
-  { day: "Sun", grooms: 5, rev: 860 },
-];
-
-const ZONES = [
-  { area: "Midtown", day: "Wednesdays", bookings: 34, fill: 92 },
-  { area: "The Annex", day: "Tuesdays", bookings: 27, fill: 84 },
-  { area: "Rosedale", day: "Thursdays", bookings: 19, fill: 68 },
-  { area: "Christie Pits", day: "Fridays", bookings: 22, fill: 76 },
-  { area: "The Beaches", day: "Saturdays", bookings: 31, fill: 88 },
-  { area: "King West", day: "Mondays", bookings: 15, fill: 54 },
-];
+const money = (n: number) => `$${n.toLocaleString("en-CA")}`;
+const changeLabel = (pct: number | null) => (pct === null ? "new" : `${pct >= 0 ? "+" : ""}${pct}% vs last month`);
 
 const VAN = [
   { label: "Fuel level", value: "72%", icon: Fuel, note: "Next fill-up Friday" },
@@ -56,36 +40,61 @@ export function AdminSurface({
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+  const [config, setConfig] = useState<StaffConfig | null>(null);
+  useEffect(() => {
+    getStaffConfig().then(setConfig);
+  }, []);
+
+  // The password is checked by the server; a pet-parent email is sent to the Customer Portal instead.
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (
-      (email.trim().toLowerCase() === "admin@thefreshpooch.ca" || email.trim().toLowerCase() === "hello@doggroomingtoronto.ca") &&
-      password.trim() === "pooch2026"
-    ) {
+    if (!looksLikeStaffEmail(email)) {
+      if (email.includes("@") && onClientLogin) onClientLogin();
+      else setError("This sign-in is for The Fresh Pooch staff. Pet parents sign in through the Customer Portal.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await staffLogin(email, password);
       setIsAuthenticated(true);
       onAuthChange?.(true);
       setError("");
-    } else if (email.trim().toLowerCase().includes("@") && !email.trim().toLowerCase().includes("admin")) {
-      // If customer enters their pet parent account here, switch to client portal
-      if (onClientLogin) {
-        onClientLogin();
-      } else {
-        setError("This is a pet parent customer account. Please log in through the Customer Portal.");
-      }
-    } else {
-      setError("Invalid credentials. Enter admin@thefreshpooch.ca / pooch2026 or use Instant Demo Access.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed.");
+    } finally {
+      setBusy(false);
     }
   };
 
-  const handleDemoLogin = () => {
-    setEmail("admin@thefreshpooch.ca");
-    setPassword("pooch2026");
-    setIsAuthenticated(true);
-    onAuthChange?.(true);
-    setError("");
+  const handleDemoLogin = async () => {
+    setBusy(true);
+    try {
+      await staffDemoLogin();
+      setIsAuthenticated(true);
+      onAuthChange?.(true);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Demo access is not available.");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const maxRev = Math.max(...WEEK.map((d) => d.rev));
+  const { appointments } = useAppointments();
+  const today = torontoToday();
+  const kpi = useMemo(() => monthKpis(appointments, today), [appointments, today]);
+  const WEEK = useMemo(() => weekBars(appointments, today), [appointments, today]);
+  const ZONES = useMemo(() => zoneCoverage(appointments, today), [appointments, today]);
+  const upcoming = useMemo(() => upcomingBookings(appointments, today), [appointments, today]);
+  const KPIS = [
+    { label: `Revenue (${kpi.monthLabel})`, value: money(kpi.revenue), delta: changeLabel(kpi.revenueChange), up: (kpi.revenueChange ?? 0) >= 0, icon: DollarSign },
+    { label: "Grooms Completed", value: String(kpi.grooms), delta: changeLabel(kpi.groomsChange), up: (kpi.groomsChange ?? 0) >= 0, icon: CalendarDays },
+    { label: "Active VIP Members", value: SAMPLE_VIP_MEMBERS.value, delta: SAMPLE_VIP_MEMBERS.delta, up: true, icon: Users },
+    { label: "Avg. Google Rating", value: SAMPLE_RATING.value, delta: SAMPLE_RATING.delta, up: true, icon: Star },
+  ];
+  const maxRev = Math.max(1, ...WEEK.map((d) => d.revenue));
+  const bestDay = WEEK.reduce((best, d) => (d.revenue > best.revenue ? d : best), WEEK[0]!);
 
   if (!isAuthenticated) {
     return (
@@ -145,18 +154,22 @@ export function AdminSurface({
 
             <button
               type="submit"
-              className="w-full rounded-xl bg-ink py-3 text-sm font-bold text-ink-foreground shadow-lift transition hover:opacity-95"
+              disabled={busy}
+              className="w-full rounded-xl bg-ink py-3 text-sm font-bold text-ink-foreground shadow-lift transition hover:opacity-95 disabled:opacity-60"
             >
-              Sign In to Ops Console
+              {busy ? "Signing in…" : "Sign In to Ops Console"}
             </button>
 
+            {config?.demoAccess && (
             <button
               type="button"
               onClick={handleDemoLogin}
+              disabled={busy}
               className="w-full rounded-xl border border-gold bg-gold-soft/40 py-2.5 text-xs font-bold text-ink transition hover:bg-gold/20 flex items-center justify-center gap-1.5"
             >
               <span>⚡ One-Click Demo Admin Access</span>
             </button>
+            )}
 
             {onClientLogin && (
               <div className="pt-2 text-center border-t border-border">
@@ -170,9 +183,10 @@ export function AdminSurface({
               </div>
             )}
 
-            <div className="text-center text-[11px] text-muted-foreground">
-              Admin demo: <code className="font-mono text-foreground font-semibold">admin@thefreshpooch.ca</code> / <code className="font-mono text-foreground font-semibold">pooch2026</code>
-            </div>
+            {config?.demoHint && <div className="text-center text-[11px] text-muted-foreground">Demo: <span className="font-mono font-semibold text-foreground">{config.demoHint}</span></div>}
+            {config && !config.signInEnabled && !config.demoAccess && (
+              <div className="text-center text-[11px] text-destructive">Staff sign-in is not configured on this server yet.</div>
+            )}
           </form>
         </div>
       </div>
@@ -200,7 +214,8 @@ export function AdminSurface({
             </button>
           )}
           <button
-            onClick={() => {
+            onClick={async () => {
+              await staffLogout();
               setIsAuthenticated(false);
               onAuthChange?.(false);
               if (onClientLogin) onClientLogin();
@@ -258,7 +273,7 @@ export function AdminSurface({
         <div className="card-surface p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold">Bookings & revenue</h2>
-            <Pill tone="gold"><TrendingUp className="h-3.5 w-3.5" /> Best day: Saturday</Pill>
+            {bestDay.revenue > 0 && <Pill tone="gold"><TrendingUp className="h-3.5 w-3.5" /> Best day: {bestDay.day}</Pill>}
           </div>
           <div className="mt-6 flex h-48 items-stretch gap-3">
             {WEEK.map((d) => (
@@ -267,14 +282,14 @@ export function AdminSurface({
                   <div
                     className={cn(
                       "w-full rounded-t-lg transition-all",
-                      d.rev === 0 ? "bg-muted" : "bg-gradient-teal",
+                      d.revenue === 0 ? "bg-muted" : "bg-gradient-teal",
                     )}
-                    style={{ height: d.rev === 0 ? "6px" : `${(d.rev / maxRev) * 100}%` }}
-                    title={`$${d.rev}`}
+                    style={{ height: d.revenue === 0 ? "6px" : `${(d.revenue / maxRev) * 100}%` }}
+                    title={`$${d.revenue} CAD`}
                   />
                 </div>
                 <div className="text-xs font-bold">{d.day}</div>
-                <div className="text-[0.65rem] text-muted-foreground">{d.grooms} grooms</div>
+                <div className="text-[0.65rem] text-muted-foreground">{d.grooms} {d.grooms === 1 ? "groom" : "grooms"}</div>
               </div>
             ))}
           </div>
@@ -302,6 +317,36 @@ export function AdminSurface({
         </div>
       </div>
 
+      <div className="card-surface mt-6 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-2xl font-semibold">Upcoming bookings</h2>
+          <Pill tone="muted">From the portal and the online quote</Pill>
+        </div>
+        {upcoming.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">No new bookings yet. Bookings made in the Customer Portal or the instant quote appear here.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="text-xs uppercase tracking-wider text-muted-foreground">
+                <tr><th className="py-2">Date</th><th>Dog</th><th>Service</th><th>Where</th><th className="text-right">Total</th><th className="text-right">Status</th></tr>
+              </thead>
+              <tbody>
+                {upcoming.map((a) => (
+                  <tr key={a.id} className="border-t border-border">
+                    <td className="py-2.5 font-semibold">{formatDate(a.date)}<div className="text-xs font-normal text-muted-foreground">{a.timeWindow ?? a.time}</div></td>
+                    <td>{a.petName}<div className="text-xs text-muted-foreground">{a.breed}</div></td>
+                    <td>{serviceName(a.service)}</td>
+                    <td className="max-w-[200px] truncate text-muted-foreground">{a.address}</td>
+                    <td className="text-right font-semibold">${a.total}</td>
+                    <td className="text-right"><Pill tone={a.status === "requested" ? "gold" : "success"}>{a.status === "requested" ? "To confirm" : "Confirmed"}</Pill></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="mt-6">
         <SectionTitle eyebrow="Route Density" title="Zone coverage this month" sub="Where the trailer parks, and how full each route day is." />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -313,7 +358,7 @@ export function AdminSurface({
                 </div>
                 <Pill tone={z.fill >= 85 ? "success" : z.fill >= 65 ? "gold" : "muted"}>{z.fill}% full</Pill>
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">{z.day} • {z.bookings} bookings</div>
+              <div className="mt-1 text-sm text-muted-foreground">{z.day} • {z.bookings} {z.bookings === 1 ? "booking" : "bookings"}</div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                 <div className="bg-gradient-gold h-full rounded-full" style={{ width: `${z.fill}%` }} />
               </div>

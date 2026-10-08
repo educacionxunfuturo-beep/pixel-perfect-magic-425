@@ -12,36 +12,14 @@ import { SubscriptionSection } from "./SubscriptionSection";
 import { PetParentAppSection } from "./PetParentAppSection";
 import { SpaReels } from "./SpaReels";
 import { ClientGallery } from "./ClientGallery";
-import { useLiveGroomCounter, recordRealCompletedGroom } from "@/lib/useLiveGroomCounter";
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
+import { ADDONS, COATS, QUOTE_BREEDS, WEIGHT_TIERS, quote, type AddonId, type CoatId, type WeightTierId } from "@/lib/pricing";
+import { ROUTE_DAYS, addDays, createAppointment, torontoToday, weekdayIndex } from "@/lib/appointments";
 
-const BREEDS = [
-  { name: "Goldendoodle", factor: 1.15 },
-  { name: "Maltese", factor: 0.95 },
-  { name: "French Bulldog", factor: 0.85 },
-  { name: "Golden Retriever", factor: 1.1 },
-  { name: "Shih Tzu", factor: 0.95 },
-  { name: "Bernedoodle", factor: 1.2 },
-  { name: "Labrador Retriever", factor: 1.0 },
-  { name: "Cavalier King Charles", factor: 0.95 },
-  { name: "Standard Poodle", factor: 1.2 },
-  { name: "Siberian Husky", factor: 1.1 },
-];
-const WEIGHTS = [
-  { id: "s", label: "Small", sub: "< 20 lbs", base: 140 },
-  { id: "m", label: "Medium", sub: "21–45 lbs", base: 155 },
-  { id: "l", label: "Large", sub: "46–75 lbs", base: 172 },
-  { id: "g", label: "Giant", sub: "76+ lbs", base: 190 },
-];
-const COATS = [
-  { id: "normal", label: "Normal Coat", add: 0 },
-  { id: "light", label: "Light Matted", add: 20 },
-  { id: "severe", label: "Severe Matted", add: 45 },
-];
-const ADDONS = [
-  { id: "salt", label: "Winter Road Salt Paw Protection", price: 25 },
-  { id: "facial", label: "Deep Blueberry Facial", price: 15 },
-  { id: "shed", label: "De-Shedding Treatment", price: 35 },
-];
+const BREEDS = QUOTE_BREEDS;
+const WEIGHTS = WEIGHT_TIERS;
+// A weight inside each tier, so the booking is priced in the same tier the visitor picked.
+const TIER_TYPICAL_LBS: Record<WeightTierId, number> = { s: 15, m: 32, l: 60, g: 90 };
 const ZONES: Record<string, { area: string; day: string }> = {
   M4P: { area: "Midtown", day: "Wednesdays" },
   M4S: { area: "Midtown", day: "Wednesdays" },
@@ -65,13 +43,14 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
   const pkg = PACKAGES.find((p) => p.id === pkgId)!;
   const [breed, setBreed] = useState("Goldendoodle");
   const [q, setQ] = useState("");
-  const [weight, setWeight] = useState("m");
-  const [coat, setCoat] = useState("normal");
+  const [weight, setWeight] = useState<WeightTierId>("m");
+  const [coat, setCoat] = useState<CoatId>("normal");
   const [postal, setPostal] = useState("M4P 1T7");
-  const [addons, setAddons] = useState<string[]>(["salt"]);
+  const [addons, setAddons] = useState<AddonId[]>(["salt"]);
   const [sibling, setSibling] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "apple_pay" | "google_pay" | "interac">("apple_pay");
   const [booked, setBooked] = useState(false);
+  const [bookingRef, setBookingRef] = useState<string | null>(null);
 
   const zone = useMemo(() => {
     const fsa = postal.replace(/\s/g, "").toUpperCase().slice(0, 3);
@@ -79,12 +58,38 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
     return ZONES[fsa] ?? (fsa.startsWith("M") ? { area: "Toronto", day: "on rotating weekdays" } : "out");
   }, [postal]);
 
-  const breedF = BREEDS.find((b) => b.name === breed)?.factor ?? 1;
-  const base = Math.max(pkg.from + (pkgId === "ultimate" ? 0 : 0), Math.round((WEIGHTS.find((w) => w.id === weight)!.base * breedF) / 5) * 5 + (pkgId === "ultimate" ? 100 : pkgId === "tidy" ? -10 : 0));
-  const coatAdd = COATS.find((c) => c.id === coat)!.add;
-  const addonTotal = ADDONS.filter((a) => addons.includes(a.id)).reduce((s, a) => s + a.price, 0);
-  const discount = sibling ? 20 : 0;
-  const total = base + coatAdd + addonTotal - discount;
+  const { total } = quote({ service: pkgId, tier: weight, breed, coat, addons, sibling });
+
+  const bookSlot = async () => {
+    if (booked) return;
+    // First route day for this postal code from tomorrow on; unknown areas get the next day and are confirmed by the team.
+    const today = torontoToday();
+    const area = zone && typeof zone === "object" ? zone.area : null;
+    const routeIndex = area ? ROUTE_DAYS.findIndex((r) => r.area === area) : -1;
+    let date = addDays(today, 1);
+    if (routeIndex >= 0) while (weekdayIndex(date) !== routeIndex) date = addDays(date, 1);
+    try {
+      const appt = await createAppointment({
+        petName: breed,
+        breed,
+        weightLbs: TIER_TYPICAL_LBS[weight],
+        service: pkgId,
+        total,
+        date,
+        time: "8:30 AM",
+        timeWindow: "To be confirmed",
+        address: `Postal code ${postal.toUpperCase()}`,
+        postalCode: postal.toUpperCase(),
+        paymentMethod,
+        status: "requested",
+        source: "web",
+      });
+      setBookingRef(appt.reference);
+      setBooked(true);
+    } catch {
+      setBooked(false);
+    }
+  };
 
   const filtered = BREEDS.filter((b) => b.name.toLowerCase().includes(q.toLowerCase()));
   const labels = ["Breed", "Weight", "Coat", "Location", "Quote"];
@@ -255,19 +260,6 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
                 </button>
               </div>
 
-              {paymentMethod === "card" && (
-                <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/30 p-3 text-xs">
-                  <div>
-                    <label className="text-[10px] font-semibold text-muted-foreground uppercase">Cardholder Details</label>
-                    <input placeholder="Card number •••• •••• •••• ••••" className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none" />
-                  </div>
-                  <div className="flex gap-2">
-                    <input placeholder="MM / YY" className="w-1/2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none" />
-                    <input placeholder="CVC" className="w-1/2 rounded-lg border border-border bg-background px-3 py-1.5 text-xs outline-none" />
-                  </div>
-                </div>
-              )}
-
               {paymentMethod === "interac" && (
                 <div className="mt-3 rounded-xl border border-[#ffd100]/50 bg-[#ffd100]/10 p-3 text-xs text-foreground">
                   <div className="font-semibold text-black">🇨🇦 Canadian Interac e-Transfer Details:</div>
@@ -276,16 +268,16 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
               )}
 
               <p className="mt-2 text-[10px] text-muted-foreground text-center">
-                🔒 256-bit SSL encrypted • Card held securely with Stripe Canada, not charged until groom completion.
+                🔒 We never ask for card numbers on this page. Payment is completed after your groom.
               </p>
             </div>
 
             {booked && (
               <div className="mt-4 flex flex-col gap-2 rounded-xl bg-success-soft p-3.5 text-xs text-success border border-success/30">
                 <div className="font-bold flex items-center gap-1.5 text-sm">
-                  <Check className="h-4 w-4" /> Slot Held Successfully!
+                  <Check className="h-4 w-4" /> Request received{bookingRef ? ` • #${bookingRef}` : ""}
                 </div>
-                <p className="text-foreground">We reserved the route slot for your {breed} in {zone && typeof zone === 'object' ? zone.area : 'Toronto'}. A confirmation message is on its way.</p>
+                <p className="text-foreground">We've requested a slot for your {breed} on our {zone && typeof zone === 'object' ? zone.area : 'Toronto'} route. Our team will confirm the exact time.</p>
                 <a
                   href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just requested a mobile grooming slot for my ${breed} (${pkg.name} - $${total} CAD) at postal code ${postal}. Method: ${paymentMethod}.`)}`}
                   target="_blank"
@@ -311,8 +303,8 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
             Continue <ChevronRight className="h-4 w-4" />
           </button>
         ) : (
-          <button onClick={() => { setBooked(true); recordRealCompletedGroom(); }} className="bg-gradient-gold flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-ink shadow-lift transition-transform hover:scale-[1.02]">
-            {booked ? <><Check className="h-4 w-4" /> Slot held — check your SMS</> : <><Clock className="h-4 w-4" /> Authorize & Book Slot (&lt; 90s)</>}
+          <button onClick={bookSlot} className="bg-gradient-gold flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-ink shadow-lift transition-transform hover:scale-[1.02]">
+            {booked ? <><Check className="h-4 w-4" /> Request sent</> : <><Clock className="h-4 w-4" /> Authorize & Book Slot (&lt; 90s)</>}
           </button>
         )}
       </div>
@@ -395,7 +387,7 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
 
       <Packages onSelect={select} />
       <SubscriptionSection />
-      <PetParentAppSection onOpenPortal={onOpenPortal} />
+      <PetParentAppSection {...(onOpenPortal ? { onOpenPortal } : {})} />
       <PressBanner />
       <SpaReels />
       <section className="border-t border-border bg-secondary/50">

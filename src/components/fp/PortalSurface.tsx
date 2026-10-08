@@ -8,9 +8,11 @@ import {
 import barnaby from "@/assets/barnaby.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
-import { dbService } from "@/lib/supabase";
 import { dispatchNotification } from "@/lib/notifications";
-import { useLiveGroomCounter, recordRealCompletedGroom } from "@/lib/useLiveGroomCounter";
+import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
+import { looksLikeStaffEmail, staffLogin } from "@/lib/staff-session";
+import { SERVICES, SERVICE_IDS, ADDONS, type ServiceId } from "@/lib/pricing";
+import { TIME_WINDOWS, addDays, createAppointment, formatDate, priceFor, torontoToday } from "@/lib/appointments";
 
 interface PetProfile {
   id: string;
@@ -48,11 +50,16 @@ const DEFAULT_PET: PetProfile = {
   latchkeyNotes: "Enter through side wooden gate. Indoor cat Jasper inside sunroom.",
 };
 
+// Barnaby is a 26 lb Mini Goldendoodle; past and future prices come from the shared price list.
+const PET_BREED = "Mini Goldendoodle";
+const PET_WEIGHT_LBS = 26;
+const FACIAL_PRICE = ADDONS.find((a) => a.id === "facial")!.price;
+
 const PAST_GROOMS = [
   {
     date: "Sep 12, 2026",
     package: "Premium Full Groom (Teddy Cut)",
-    price: "$149 CAD",
+    price: `$${priceFor("full", PET_BREED, PET_WEIGHT_LBS)} CAD`,
     groomer: "Sarah M.",
     report: { coat: "Silky & Mat-Free", ears: "Cleansed & Plucked", nails: "Clipped & Buffed", mood: "Happy Angel ⭐" },
     notes: "Barnaby was a delight! Gentle conditioning treatment applied for sensitive skin.",
@@ -60,7 +67,7 @@ const PAST_GROOMS = [
   {
     date: "Aug 08, 2026",
     package: "Bath & Tidy + Blueberry Facial",
-    price: "$135 CAD",
+    price: `$${priceFor("tidy", PET_BREED, PET_WEIGHT_LBS) + FACIAL_PRICE} CAD`,
     groomer: "Sarah M.",
     report: { coat: "Fresh & Fluffed", ears: "Clean", nails: "Buffed Smooth", mood: "Calm & Relaxed" },
     notes: "Summer heat de-shedding and paw pad balm applied.",
@@ -82,6 +89,10 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [userName, setUserName] = useState("Jordan Miller");
   const [userPhone, setUserPhone] = useState("(416) 555-0199");
   const [userAddress, setUserAddress] = useState("142 Roehampton Ave, Midtown Toronto M4P 1R4");
+  // Demo pet-parent password is pre-filled; staff emails are checked by the server.
+  const [loginPassword, setLoginPassword] = useState("demo-pass");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [signingIn, setSigningIn] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"overview" | "book" | "vaccines" | "history" | "rewards" | "matting" | "vip">("overview");
   const [pet, setPet] = useState<PetProfile>(DEFAULT_PET);
@@ -99,9 +110,12 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [showPwaBanner, setShowPwaBanner] = useState(true);
 
   // Native Booking state
-  const [bookingDate, setBookingDate] = useState("2026-10-18");
-  const [bookingSlot, setBookingSlot] = useState("Morning (8:30 AM – 11:00 AM)");
-  const [bookingPackage, setBookingPackage] = useState("Premium Full Groom ($140 – $185 CAD)");
+  const [bookingDate, setBookingDate] = useState(() => addDays(torontoToday(), 1));
+  const [bookingSlot, setBookingSlot] = useState(TIME_WINDOWS[0]!.label);
+  const [bookingPackage, setBookingPackage] = useState<ServiceId>("full");
+  const [bookingRef, setBookingRef] = useState<string | null>(null);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const bookingPrice = priceFor(bookingPackage, PET_BREED, PET_WEIGHT_LBS);
   const [bookingPayment, setBookingPayment] = useState<"card" | "apple_pay" | "google_pay" | "interac">("apple_pay");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
 
@@ -135,16 +149,20 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               </div>
 
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
-                  if (
-                    userEmail.trim().toLowerCase() === "admin@thefreshpooch.ca" ||
-                    userEmail.trim().toLowerCase() === "hello@doggroomingtoronto.ca"
-                  ) {
-                    if (onAdminLogin) {
-                      onAdminLogin();
-                      return;
+                  setLoginError(null);
+                  if (looksLikeStaffEmail(userEmail)) {
+                    setSigningIn(true);
+                    try {
+                      await staffLogin(userEmail, loginPassword);
+                      onAdminLogin?.();
+                    } catch (err) {
+                      setLoginError(err instanceof Error ? err.message : "Sign-in failed.");
+                    } finally {
+                      setSigningIn(false);
                     }
+                    return;
                   }
                   setIsAuthenticated(true);
                 }}
@@ -179,7 +197,8 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   <input
                     type="password"
                     required
-                    defaultValue="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal"
                   />
                 </div>
@@ -197,8 +216,10 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   </div>
                 )}
 
+                {loginError && <p className="text-xs font-semibold text-destructive">{loginError}</p>}
                 <button
                   type="submit"
+                  disabled={signingIn}
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-teal py-3 text-sm font-bold text-white shadow-lift transition-transform hover:scale-[1.02]"
                 >
                   <PawPrint className="h-4 w-4" />
@@ -592,11 +613,11 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               </div>
               <h3 className="font-serif text-2xl font-bold text-ink">Appointment Confirmed!</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Booking reference <strong>#FP-2026-B81</strong> has been locked into Van #1's route for <strong>{bookingDate}</strong> during the <strong>{bookingSlot}</strong> window.
+                Booking reference <strong>#{bookingRef}</strong> has been locked into Van #1's route for <strong>{formatDate(bookingDate)}</strong> during the <strong>{bookingSlot}</strong> window.
               </p>
               <div className="rounded-2xl border border-border bg-secondary/50 p-4 text-xs max-w-sm mx-auto text-left space-y-2">
                 <div><strong>Dog:</strong> {pet.name} ({pet.breed})</div>
-                <div><strong>Package:</strong> {bookingPackage}</div>
+                <div><strong>Package:</strong> {SERVICES[bookingPackage].name} • ${bookingPrice} CAD</div>
                 <div><strong>Location:</strong> {userAddress}</div>
                 <div><strong>Payment Method:</strong> <span className="uppercase font-bold text-teal">{bookingPayment}</span> (CAD)</div>
                 <div><strong>Latchkey Access:</strong> Authorized (Code {pet.latchkeyCode})</div>
@@ -604,7 +625,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
 
               <div className="pt-2">
                 <a
-                  href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just confirmed an appointment for ${pet.name} (${bookingPackage}) on ${bookingDate} (${bookingSlot}) at ${userAddress}. Payment: ${bookingPayment}.`)}`}
+                  href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just confirmed appointment #${bookingRef} for ${pet.name} (${SERVICES[bookingPackage].name}) on ${bookingDate} (${bookingSlot}) at ${userAddress}. Payment: ${bookingPayment}.`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-90 transition"
@@ -632,32 +653,35 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                setBookingConfirmed(true);
-                recordRealCompletedGroom();
+                setBookingError(null);
                 try {
-                  await dbService.saveAppointment({
-                    owner_id: "owner_demo_01",
-                    dog_id: pet.id,
-                    package_id: bookingPackage,
-                    service_date: bookingDate,
-                    time_window: bookingSlot,
-                    postal_code: "M4P 1R4",
+                  const appt = await createAppointment({
+                    petName: pet.name,
+                    breed: PET_BREED,
+                    weightLbs: PET_WEIGHT_LBS,
+                    service: bookingPackage,
+                    date: bookingDate,
+                    time: TIME_WINDOWS.find((w) => w.label === bookingSlot)?.start ?? "8:30 AM",
+                    timeWindow: bookingSlot,
                     address: userAddress,
-                    latchkey_code: pet.latchkeyCode,
-                    total_cad: 149,
-                    payment_method: bookingPayment,
-                    payment_status: "hold_authorized",
-                    status: "confirmed",
+                    ownerName: userName,
+                    ownerPhone: userPhone,
+                    ...(pet.latchkeyCode ? { latchkeyCode: pet.latchkeyCode } : {}),
+                    notes: pet.latchkeyNotes,
+                    paymentMethod: bookingPayment,
+                    source: "portal",
                   });
+                  setBookingRef(appt.reference);
+                  setBookingConfirmed(true);
                   await dispatchNotification("booking_confirmed", "whatsapp", {
                     toPhone: userPhone,
                     clientName: userName,
                     dogName: pet.name,
-                    appointmentTime: `${bookingDate} (${bookingSlot})`,
+                    appointmentTime: `${formatDate(bookingDate)} (${bookingSlot})`,
                     address: userAddress,
                   });
-                } catch {
-                  // graceful fallback
+                } catch (err) {
+                  setBookingError(err instanceof Error ? err.message : "Booking failed. Please try again.");
                 }
               }}
               className="space-y-6"
@@ -673,13 +697,16 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   <label className="text-xs font-bold text-foreground">Select Spa Package</label>
                   <select
                     value={bookingPackage}
-                    onChange={(e) => setBookingPackage(e.target.value)}
+                    onChange={(e) => setBookingPackage(e.target.value as ServiceId)}
                     className="mt-1 w-full rounded-xl border border-border bg-background p-2.5 text-sm"
                   >
-                    <option>Bath & Tidy (From $130 CAD)</option>
-                    <option>Premium Full Groom ($140 – $185 CAD)</option>
-                    <option>The Ultimate Spa Experience ($260 – $290 CAD)</option>
+                    {SERVICE_IDS.map((id) => (
+                      <option key={id} value={id}>
+                        {SERVICES[id].name} ({SERVICES[id].published} CAD)
+                      </option>
+                    ))}
                   </select>
+                  <p className="mt-1 text-[11px] font-semibold text-teal">Price for {pet.name}: ${bookingPrice} CAD</p>
                 </div>
               </div>
 
@@ -702,9 +729,9 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     onChange={(e) => setBookingSlot(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-border bg-background p-2.5 text-sm"
                   >
-                    <option>Morning (8:30 AM – 11:00 AM)</option>
-                    <option>Midday (11:30 AM – 2:00 PM)</option>
-                    <option>Afternoon (2:30 PM – 5:30 PM)</option>
+                    {TIME_WINDOWS.map((w) => (
+                      <option key={w.label}>{w.label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -792,8 +819,9 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 type="submit"
                 className="w-full rounded-full bg-gradient-gold py-3 text-sm font-bold text-ink shadow-lift transition-transform hover:scale-[1.01]"
               >
-                Confirm Booking & Dispatch Van #1
+                Confirm Booking & Dispatch Van #1 • ${bookingPrice} CAD
               </button>
+              {bookingError && <p className="text-center text-xs font-semibold text-destructive">{bookingError}</p>}
             </form>
           )}
         </div>
@@ -1053,7 +1081,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   id: "free_groom",
                   title: "100% Free Full Spa Groom Visit",
                   cost: 750,
-                  val: "$149 CAD value",
+                  val: `$${priceFor("full", PET_BREED, PET_WEIGHT_LBS)} CAD value`,
                   desc: "Complete head-to-paw luxury grooming package in our heated mobile van.",
                 },
               ].map((r) => {

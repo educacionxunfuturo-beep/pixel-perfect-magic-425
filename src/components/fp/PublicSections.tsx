@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SERVICES } from "@/lib/pricing";
 import { Check, Star, ChevronDown, Newspaper, ShieldCheck, Leaf, Award, Phone, Mail, Clock, MapPin, Instagram } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle, BrandLogo } from "./primitives";
@@ -6,11 +7,11 @@ import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 
 export type PackageId = "tidy" | "full" | "ultimate";
 export const PACKAGES: { id: PackageId; name: string; price: string; from: number; best: string; includes: string[]; popular?: boolean }[] = [
-  { id: "tidy", name: "Bath & Tidy", price: "From $130", from: 130, best: "Short coats, routine hygiene, and between-haircut freshness.",
+  { id: "tidy", name: SERVICES.tidy.name, price: SERVICES.tidy.published, from: SERVICES.tidy.floor, best: "Short coats, routine hygiene, and between-haircut freshness.",
     includes: ["Double shampoo with 100% organic botanical washes", "Warm conditioning rinse", "Hand blow-dry (100% cage-free)", "Nail clipping & buffing", "Ear cleansing", "Pad trim & sanitary hygiene tidy"] },
-  { id: "full", name: "Premium Full Groom", price: "$140 – $250", from: 140, popular: true, best: "Breeds requiring haircuts (Doodles, Maltese, Shih Tzus, Poodles).",
+  { id: "full", name: SERVICES.full.name, price: SERVICES.full.published, from: SERVICES.full.floor, popular: true, best: "Breeds requiring haircuts (Doodles, Maltese, Shih Tzus, Poodles).",
     includes: ["Everything in Bath & Tidy", "Full body precision styling (Teddy Bear, Puppy Cut, or breed standard)", "Facial fluffing", "Paw pad treatment", "Artisan cologne spritz"] },
-  { id: "ultimate", name: "The Ultimate Spa Experience", price: "$260 – $290+", from: 260, best: "Double-coated or luxury pampering (Golden Retrievers, Huskies, Bernedoodles).",
+  { id: "ultimate", name: SERVICES.ultimate.name, price: SERVICES.ultimate.published, from: SERVICES.ultimate.floor, best: "Double-coated or luxury pampering (Golden Retrievers, Huskies, Bernedoodles).",
     includes: ["Full Groom", "Intensive De-Shedding & undercoat blowout", "Deep Organic Blueberry Facial", "Soothing paw balm massage", "Fresh enzymatic breath spray"] },
 ];
 

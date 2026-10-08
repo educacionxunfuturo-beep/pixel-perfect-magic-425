@@ -22,3 +22,22 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Configuration
+
+Server settings live on the Cloudflare Worker, never in the browser bundle (see `src/lib/server-api.ts`).
+
+| Name | Type | Purpose |
+| --- | --- | --- |
+| `STAFF_PASSWORD` | secret | Staff sign-in password. Sign-in is disabled while it is unset. |
+| `SESSION_SECRET` | secret | Signs staff sessions (HttpOnly cookie). |
+| `STAFF_EMAILS` | var | Comma-separated staff emails (default: `admin@thefreshpooch.ca,hello@doggroomingtoronto.ca`). |
+| `DEMO_STAFF_ACCESS`, `DEMO_STAFF_HINT` | var | Public demo only: one-click demo sign-in and the hint shown on the sign-in screen. Remove both for real use. |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` / `TWILIO_FROM` | secret / var | Real SMS sending. Without them the app says the SMS was not sent. |
+| `GEMINI_API_KEY` | secret | Live Qimmiq answers. Without it Qimmiq uses its built-in engine. |
+
+Set secrets with `npx wrangler secret put NAME --name thefreshpooch`; vars live in `wrangler.json`.
+
+Data: with `VITE_API_URL` set, bookings go to the NestJS backend (`/booking/*`); without it (the public demo) they are kept in each visitor's browser (`src/lib/appointments.ts`). Prices for the whole app come from `src/lib/pricing.ts`.
+
+Local server settings: put them in `.dev.vars` (git-ignored) and start with `node --env-file=.dev.vars node_modules/vite/bin/vite.js dev`.

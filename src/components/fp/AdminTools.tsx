@@ -157,7 +157,7 @@ function CalendarSyncCard() {
         </div>
         <div className="flex items-center gap-1.5 text-[0.72rem] text-teal">
           <Smartphone className="h-3.5 w-3.5 shrink-0" />
-          <span>Compatible con iPhone (Ajustes &gt; Calendario &gt; Añadir cuenta iCal) y Google Calendar</span>
+          <span>Works with iPhone (Settings &gt; Calendar &gt; Accounts &gt; Add Subscribed Calendar) and Google Calendar</span>
         </div>
       </div>
     </div>

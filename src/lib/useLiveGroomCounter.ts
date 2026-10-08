@@ -15,7 +15,7 @@ export function useLiveGroomCounter(baseCount = BASE_VERIFIED_GROOMS) {
     return baseCount;
   });
 
-  // Only updates when a real booking or groom is actually completed/recorded in the system
+  // Only updates when a groomer completes a stop in the groomer app
   useEffect(() => {
     const handleRealGroomRecorded = () => {
       if (typeof window !== "undefined") {
@@ -39,7 +39,7 @@ export function useLiveGroomCounter(baseCount = BASE_VERIFIED_GROOMS) {
 }
 
 /**
- * Call this function ONLY when a real booking is confirmed or a real groom is completed
+ * Call this ONLY when a groom is completed (groomer app "Complete Stop"). Bookings are not grooms.
  */
 export function recordRealCompletedGroom() {
   if (typeof window === "undefined") return;

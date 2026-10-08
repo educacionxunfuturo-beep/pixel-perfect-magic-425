@@ -190,6 +190,7 @@ export function SpaReels() {
         document.body.style.overflow = prevOverflow;
       };
     }
+    return undefined;
   }, [activeModalReel]);
 
   useEffect(() => {

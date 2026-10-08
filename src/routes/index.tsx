@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getStaffSession } from "@/lib/staff-session";
 import { TopNav, type Surface } from "@/components/fp/TopNav";
 import { PublicSurface } from "@/components/fp/PublicSurface";
 import { PortalSurface } from "@/components/fp/PortalSurface";
@@ -35,6 +36,11 @@ function Index() {
   const [surface, setSurface] = useState<Surface>("public");
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
 
+  // A staff session survives page reloads through its HttpOnly cookie.
+  useEffect(() => {
+    getStaffSession().then((s) => setIsAdminAuthenticated(s.authenticated));
+  }, []);
+
   const handleNavChange = (s: Surface) => {
     if (s === "portal" && isAdminAuthenticated) {
       setSurface("admin");
@@ -56,10 +62,10 @@ function Index() {
             }}
           />
         )}
-        {surface === "groomer" && <GroomerSurface onBackToAdmin={() => setSurface("admin")} />}
+        {surface === "groomer" && isAdminAuthenticated && <GroomerSurface onBackToAdmin={() => setSurface("admin")} />}
         {surface === "admin" && (
           <AdminSurface
-            initialAuthenticated={true}
+            initialAuthenticated={isAdminAuthenticated}
             onViewGroomer={() => setSurface("groomer")}
             onClientLogin={() => {
               setIsAdminAuthenticated(false);
