@@ -39,6 +39,7 @@ export function buildOpsSnapshot(appointments: Appointment[], today = torontoTod
     `Upcoming bookings from the portal and website (${upcomingBookings(appointments, today).length}, ${requests} still awaiting confirmation):`,
     upcoming.length ? upcoming.map((a) => `  - ${formatDate(a.date)} ${a.timeWindow ?? a.time} ${a.petName} (${a.breed || "breed not given"}) · ${serviceName(a.service)} · ${money(a.total)} · ${a.status} · from ${a.source}`).join("\n") : "  - none",
     "Vaccine records: Barnaby (#FP-0428) Rabies valid to Nov 20 2026, DHPP valid to Jan 15 2027, Bordetella expires Oct 24 2026 (booster due). Other dogs have no certificates uploaded yet.",
-    "Sample figures (not connected to live data yet): 54 VIP members, Google rating 4.9, Van #1 fuel 72%, water tank full, next service Dec 12.",
+    "Google rating: 4.8 from 164 reviews (public Google Maps figure, Oct 2026; not updated live).",
+    "Sample figures (not connected to live data yet): 54 VIP members, Van #1 fuel 72%, water tank full, next service Dec 12.",
   ].join("\n");
 }

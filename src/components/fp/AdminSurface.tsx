@@ -6,13 +6,13 @@ import {
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
 import { AdminTools } from "./AdminTools";
+import { GOOGLE_RATING } from "./PublicSections";
 import { formatDate, serviceName, torontoToday, updateAppointment, useAppointments } from "@/lib/appointments";
 import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "@/lib/dashboard-stats";
 import { getStaffConfig, looksLikeStaffEmail, staffDemoLogin, staffLogin, staffLogout, type StaffConfig } from "@/lib/staff-session";
 
 // Not tracked by the appointment store yet: sample figures for the demo.
 const SAMPLE_VIP_MEMBERS = { value: "54", delta: "+8 this month" };
-const SAMPLE_RATING = { value: "4.9", delta: "312 reviews" };
 
 const money = (n: number) => `$${n.toLocaleString("en-CA")}`;
 const changeLabel = (pct: number | null) => (pct === null ? "new" : `${pct >= 0 ? "+" : ""}${pct}% vs last month`);
@@ -91,7 +91,7 @@ export function AdminSurface({
     { label: `Revenue (${kpi.monthLabel})`, value: money(kpi.revenue), delta: changeLabel(kpi.revenueChange), up: (kpi.revenueChange ?? 0) >= 0, icon: DollarSign },
     { label: "Grooms Completed", value: String(kpi.grooms), delta: changeLabel(kpi.groomsChange), up: (kpi.groomsChange ?? 0) >= 0, icon: CalendarDays },
     { label: "Active VIP Members", value: SAMPLE_VIP_MEMBERS.value, delta: SAMPLE_VIP_MEMBERS.delta, up: true, icon: Users },
-    { label: "Avg. Google Rating", value: SAMPLE_RATING.value, delta: SAMPLE_RATING.delta, up: true, icon: Star },
+    { label: "Avg. Google Rating", value: GOOGLE_RATING.value, delta: `${GOOGLE_RATING.reviews} reviews`, up: true, icon: Star },
   ];
   const maxRev = Math.max(1, ...WEEK.map((d) => d.revenue));
   const bestDay = WEEK.reduce((best, d) => (d.revenue > best.revenue ? d : best), WEEK[0]!);

@@ -55,30 +55,36 @@ export function PressBanner() {
   );
 }
 
+// Public Google Maps reviews of The Fresh Pooch - Mobile Dog Grooming (checked Oct 2026), shortened names.
+export const GOOGLE_RATING = { value: "4.8", reviews: 164 };
+const GOOGLE_REVIEWS_URL = "https://www.google.com/maps/search/?api=1&query=The+Fresh+Pooch+Mobile+Dog+Grooming+Toronto";
 const REVIEWS = [
-  { name: "Michelle K.", area: "Leaside", dog: "Mini Goldendoodle", text: "Our mini doodle Bentley gets terrible anxiety at traditional salons. Having the trailer pull up to our driveway in Leaside changed everything. Sarah was gentle and Bentley looks like an absolute teddy bear." },
-  { name: "Dave R.", area: "Midtown", dog: "French Bulldog", text: "Living in a condo on Yonge & Eglinton, taking my dog to a groomer was a nightmare. The Fresh Pooch met me right at the visitor loop. 70 minutes later, spotless Frenchie with no stress." },
-  { name: "Elena S.", area: "The Annex", dog: "Maltese", text: "The winter road salt protection and paw balm is essential in Toronto Januarys. Super transparent pricing and the digital report card photos made my day." },
+  { name: "Laura T.", dog: "Stuart, first groom", text: "Angelica was wonderful with Stuart! She did everything we discussed perfectly and Stuart seemed to really like her. It was his first groomer visit so I'm thrilled he had such a great groomer." },
+  { name: "Jenner M.", dog: "Gibson, senior & blind", text: "This was our first time using The Fresh Pooch and we are happy. Our dog is older and blind and the whole experience for him (and us) was easy... and the cut looks good!" },
+  { name: "Fung L.", dog: "Anxious pup", text: "Such a cute cut and great care. I have a very anxious dog and wish I found out about them sooner. Fast, good quality and convenient. Groomer Nicole was so lovely and my dog was under her spell." },
 ];
 
 export function Reviews() {
   const { count } = useLiveGroomCounter(648);
   return (
     <div>
-      <SectionTitle eyebrow="Toronto Client Love" title="5.0 Star Experience" sub={`Over ${count}+ happy dogs pampered right at their doorstep across Toronto.`} />
+      <SectionTitle eyebrow="Toronto Client Love" title={`Rated ${GOOGLE_RATING.value} on Google`} sub={`${GOOGLE_RATING.reviews} Google reviews and over ${count}+ happy dogs pampered right at their doorstep across Toronto.`} />
       <div className="space-y-4">
         {REVIEWS.map((r) => (
           <div key={r.name} className="card-surface p-5">
             <div className="flex items-center justify-between">
               <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-amber text-amber" />)}</div>
-              <span className="text-xs font-semibold text-teal">Verified Client</span>
+              <span className="text-xs font-semibold text-teal">Google review</span>
             </div>
             <p className="mt-3 font-serif text-lg leading-snug">“{r.text}”</p>
-            <div className="mt-3 text-sm text-muted-foreground"><strong className="text-foreground">{r.name}</strong> • {r.area} • {r.dog}</div>
+            <div className="mt-3 text-sm text-muted-foreground"><strong className="text-foreground">{r.name}</strong> • {r.dog}</div>
           </div>
         ))}
       </div>
-      <a href="https://instagram.com/thefreshpooch" target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal hover:bg-teal/5 transition-colors"><Instagram className="h-4 w-4" /> See More Real Stories @thefreshpooch</a>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <a href={GOOGLE_REVIEWS_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal hover:bg-teal/5 transition-colors"><Star className="h-4 w-4" /> Read all {GOOGLE_RATING.reviews} reviews on Google</a>
+        <a href="https://instagram.com/thefreshpooch" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal hover:bg-teal/5 transition-colors"><Instagram className="h-4 w-4" /> Real stories @thefreshpooch</a>
+      </div>
     </div>
   );
 }
