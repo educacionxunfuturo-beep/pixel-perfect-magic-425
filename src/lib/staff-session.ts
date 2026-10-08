@@ -32,18 +32,26 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
   return data.error ?? fallback;
 }
 
+/** Staff can read the shared bookings: every part of the app showing bookings reloads them. */
+function refreshBookings() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("fp-appointments-changed"));
+}
+
 export async function staffLogin(email: string, password: string): Promise<void> {
   const res = await post("/api/staff/login", { email, password });
   if (!res.ok) throw new Error(await errorMessage(res, "Sign-in failed."));
+  refreshBookings();
 }
 
 export async function staffDemoLogin(): Promise<void> {
   const res = await post("/api/staff/demo-login");
   if (!res.ok) throw new Error(await errorMessage(res, "Demo access is not available."));
+  refreshBookings();
 }
 
 export async function staffLogout(): Promise<void> {
   await post("/api/staff/logout").catch(() => undefined);
+  refreshBookings();
 }
 
 export async function getStaffSession(): Promise<{ authenticated: boolean; email?: string }> {
