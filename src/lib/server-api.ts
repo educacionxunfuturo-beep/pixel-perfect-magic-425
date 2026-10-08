@@ -13,6 +13,8 @@ import { buildCopilotPrompt, buildQimmiqPrompt, type QimmiqContext } from "./qim
  *   GEMINI_API_KEY      secret  live Qimmiq answers through Google Gemini (AI Studio key)
  *   GEMINI_MODELS       var     optional comma-separated model list, tried in order
  *   BOOKINGS_DB         D1      shared bookings (portal, quote and Qimmiq cart) so staff see them on any device
+ *   NTFY_TOPIC          secret  optional; push alert to the owner's phone (ntfy app) for each new booking
+ * Pet-parent accounts live in the same D1 database (table customers); see migrations/.
  */
 
 type Env = Record<string, string | undefined>;
@@ -78,11 +80,38 @@ function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   return diff === 0;
 }
 
-async function hmacKey(env: Env): Promise<CryptoKey | null> {
+async function hmacKey(env: Env, purpose: "staff" | "client" = "staff"): Promise<CryptoKey | null> {
   const secret = env["SESSION_SECRET"] || (env["STAFF_PASSWORD"] ? `fp-session:${env["STAFF_PASSWORD"]}` : "");
   if (!secret) return null;
-  const raw = await sha256(secret);
+  const raw = await sha256(purpose === "staff" ? secret : `${purpose}:${secret}`);
   return crypto.subtle.importKey("raw", raw.buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+
+async function signedCookie(env: Env, purpose: "staff" | "client", name: string, email: string, maxAge: number, request: Request): Promise<string | null> {
+  const key = await hmacKey(env, purpose);
+  if (!key) return null;
+  const payload = b64url(enc.encode(JSON.stringify({ email, kind: purpose, exp: Math.floor(Date.now() / 1000) + maxAge })));
+  const sig = b64url(await crypto.subtle.sign("HMAC", key, enc.encode(payload)));
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return `${name}=${payload}.${sig}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+}
+
+async function readSignedCookie(request: Request, env: Env, purpose: "staff" | "client", name: string): Promise<string | null> {
+  const cookie = request.headers.get("cookie") ?? "";
+  const token = cookie.split(/;\s*/).find((c) => c.startsWith(`${name}=`))?.slice(name.length + 1);
+  if (!token) return null;
+  const [payload, sig] = token.split(".");
+  const key = await hmacKey(env, purpose);
+  if (!payload || !sig || !key) return null;
+  const sigBytes = Uint8Array.from(fromB64url(sig), (c) => c.charCodeAt(0));
+  if (!(await crypto.subtle.verify("HMAC", key, sigBytes, enc.encode(payload)))) return null;
+  try {
+    const data = JSON.parse(fromB64url(payload)) as { email: string; exp: number; kind?: string };
+    if (data.exp < Date.now() / 1000 || (data.kind ?? "staff") !== purpose) return null;
+    return data.email;
+  } catch {
+    return null;
+  }
 }
 
 // ---------- staff sessions ----------
@@ -94,7 +123,7 @@ function staffEmails(env: Env): string[] {
 async function createSession(env: Env, email: string, request: Request): Promise<string | null> {
   const key = await hmacKey(env);
   if (!key) return null;
-  const payload = b64url(enc.encode(JSON.stringify({ email, exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS })));
+  const payload = b64url(enc.encode(JSON.stringify({ email, kind: "staff", exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS })));
   const sig = b64url(await crypto.subtle.sign("HMAC", key, enc.encode(payload)));
   const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
   return `${SESSION_COOKIE}=${payload}.${sig}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_SECONDS}${secure}`;
@@ -111,8 +140,8 @@ export async function readStaffSession(request: Request, rawEnv: unknown): Promi
   const sigBytes = Uint8Array.from(fromB64url(sig), (c) => c.charCodeAt(0));
   if (!(await crypto.subtle.verify("HMAC", key, sigBytes, enc.encode(payload)))) return null;
   try {
-    const data = JSON.parse(fromB64url(payload)) as { email: string; exp: number };
-    if (data.exp < Date.now() / 1000 || !staffEmails(env).includes(data.email)) return null;
+    const data = JSON.parse(fromB64url(payload)) as { email: string; exp: number; kind?: string };
+    if (data.exp < Date.now() / 1000 || (data.kind ?? "staff") !== "staff" || !staffEmails(env).includes(data.email)) return null;
     return { email: data.email };
   } catch {
     return null;
@@ -281,7 +310,7 @@ function cleanBooking(raw: BookingRecord): BookingRecord | null {
     date,
     service: raw.service,
     source: raw.source,
-    status: raw.status === "confirmed" ? "confirmed" : "requested",
+    status: "requested", // public bookings are requests until staff confirm them
     total: Number.isFinite(total) ? Math.min(Math.max(Math.round(total), 0), 5000) : 0,
     weightLbs: Number.isFinite(weight) ? Math.min(Math.max(Math.round(weight), 1), 250) : 30,
     reference: text(raw.reference, 30) ?? id,
@@ -306,8 +335,33 @@ async function createBooking(request: Request, rawEnv: unknown): Promise<Respons
   if (!booking) return json({ error: "Invalid booking." }, 400);
   const now = new Date().toISOString();
   // INSERT OR IGNORE: a request can never overwrite an existing booking
-  await db.prepare("INSERT OR IGNORE INTO bookings (id, date, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(booking.id, booking.date, JSON.stringify(booking), now, now).run();
+  const customerEmail = await readSignedCookie(request, readEnv(rawEnv), "client", CLIENT_COOKIE);
+  const result = (await db
+    .prepare("INSERT OR IGNORE INTO bookings (id, date, data, created_at, updated_at, customer_email) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(booking.id, booking.date, JSON.stringify(booking), now, now, customerEmail)
+    .run()) as { meta?: { changes?: number } };
+  if (result?.meta?.changes !== 0) await notifyOwner(request, readEnv(rawEnv), booking);
   return json({ shared: true, id: booking.id }, 201);
+}
+
+const SERVICE_LABELS: Record<string, string> = { tidy: "Bath & Tidy", full: "Premium Full Groom", ultimate: "Ultimate Spa" };
+
+/** Push alert to the owner's phone through ntfy. Only the dog, service and date go out: no address, phone or codes. */
+async function notifyOwner(request: Request, env: Env, booking: BookingRecord) {
+  const topic = env["NTFY_TOPIC"];
+  if (!topic) return;
+  const dog = [booking.petName, booking.breed].filter(Boolean).join(", ");
+  const when = [booking.date, booking.timeWindow].filter(Boolean).join(" ");
+  try {
+    await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+      method: "POST",
+      headers: { Title: "New booking request", Tags: "dog", Click: new URL("/", request.url).toString() },
+      body: `${dog}: ${SERVICE_LABELS[String(booking.service)] ?? booking.service}, ${when}, $${booking.total} CAD. Confirm it in the owner dashboard.`,
+      signal: AbortSignal.timeout(3_000),
+    });
+  } catch {
+    // the booking is saved either way; the dashboard shows it
+  }
 }
 
 async function listBookings(request: Request, rawEnv: unknown): Promise<Response> {
@@ -338,6 +392,88 @@ async function patchBooking(request: Request, rawEnv: unknown, id: string): Prom
   return json({ ok: true });
 }
 
+// ---------- pet-parent accounts (D1 table customers) ----------
+
+const CLIENT_COOKIE = "fp_client";
+const CLIENT_SECONDS = 30 * 24 * 60 * 60;
+const PBKDF2_ITERATIONS = 100_000; // the Workers runtime maximum
+
+interface CustomerProfile {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  pet: { name: string; breed: string; weightLbs: number };
+  createdAt: string;
+}
+
+async function hashPassword(password: string, saltB64?: string): Promise<{ hash: string; salt: string }> {
+  const salt = saltB64 ? Uint8Array.from(fromB64url(saltB64), (c) => c.charCodeAt(0)) : crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: PBKDF2_ITERATIONS }, key, 256);
+  return { hash: b64url(bits), salt: b64url(salt) };
+}
+
+async function accountResponse(db: D1Like, profile: CustomerProfile, headers: Record<string, string> = {}): Promise<Response> {
+  const { results } = await db.prepare("SELECT data FROM bookings WHERE customer_email = ? ORDER BY date DESC LIMIT 50").bind(profile.email).all<{ data: string }>();
+  return json({ profile, bookings: results.map((r) => JSON.parse(r.data)) }, 200, headers);
+}
+
+async function signup(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Accounts are not available on this server." }, 503);
+  if (rateLimited(`signup:${clientIp(request)}`, 5, 60 * 60 * 1000)) return json({ error: "Too many sign-ups from this connection. Try again later." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+  const email = String(body["email"] ?? "").trim().toLowerCase().slice(0, 120);
+  const password = String(body["password"] ?? "");
+  const name = String(body["name"] ?? "").trim().slice(0, 80);
+  const petName = String(body["petName"] ?? "").trim().slice(0, 40);
+  const weight = Number(body["petWeightLbs"]);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Please enter a valid email address." }, 400);
+  if (password.length < 8 || password.length > 200) return json({ error: "Use a password of at least 8 characters." }, 400);
+  if (!name || !petName) return json({ error: "Please add your name and your dog's name." }, 400);
+  if (staffEmails(env).includes(email)) return json({ error: "This email belongs to the staff. Sign in with it instead." }, 400);
+  const profile: CustomerProfile = {
+    name,
+    email,
+    phone: String(body["phone"] ?? "").trim().slice(0, 30),
+    address: String(body["address"] ?? "").trim().slice(0, 160),
+    pet: { name: petName, breed: String(body["petBreed"] ?? "").trim().slice(0, 60) || "Mixed breed", weightLbs: Number.isFinite(weight) ? Math.min(Math.max(Math.round(weight), 2), 250) : 30 },
+    createdAt: new Date().toISOString(),
+  };
+  const { hash, salt } = await hashPassword(password);
+  const result = (await db
+    .prepare("INSERT OR IGNORE INTO customers (email, data, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(email, JSON.stringify(profile), hash, salt, profile.createdAt)
+    .run()) as { meta?: { changes?: number } };
+  if (result?.meta?.changes === 0) return json({ error: "An account with this email already exists. Sign in instead." }, 409);
+  const cookie = await signedCookie(env, "client", CLIENT_COOKIE, email, CLIENT_SECONDS, request);
+  return accountResponse(db, profile, cookie ? { "set-cookie": cookie } : {});
+}
+
+async function clientLogin(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Accounts are not available on this server." }, 503);
+  if (rateLimited(`client-login:${clientIp(request)}`, 10, 10 * 60 * 1000)) return json({ error: "Too many sign-in attempts. Try again in a few minutes." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { email?: string; password?: string };
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const row = await db.prepare("SELECT data, password_hash, salt FROM customers WHERE email = ?").bind(email).first<{ data: string; password_hash: string; salt: string }>();
+  // hash even when the account does not exist, so timing does not reveal which emails are registered
+  const { hash } = await hashPassword(String(body.password ?? ""), row?.salt);
+  if (!row || !sameBytes(enc.encode(hash), enc.encode(row.password_hash))) return json({ error: "Wrong email or password." }, 401);
+  const cookie = await signedCookie(env, "client", CLIENT_COOKIE, email, CLIENT_SECONDS, request);
+  return accountResponse(db, JSON.parse(row.data) as CustomerProfile, cookie ? { "set-cookie": cookie } : {});
+}
+
+async function currentAccount(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  const email = await readSignedCookie(request, env, "client", CLIENT_COOKIE);
+  if (!db || !email) return json({ authenticated: false }, 401);
+  const row = await db.prepare("SELECT data FROM customers WHERE email = ?").bind(email).first<{ data: string }>();
+  if (!row) return json({ authenticated: false }, 401);
+  return accountResponse(db, JSON.parse(row.data) as CustomerProfile);
+}
+
 // ---------- router ----------
 
 /** Handles /api/* routes; returns null for anything else so the app renders normally. */
@@ -362,6 +498,10 @@ export async function handleApi(request: Request, rawEnv: unknown): Promise<Resp
   if (pathname === "/api/qimmiq/status" && method === "GET") return json({ configured: Boolean(env["GEMINI_API_KEY"]) });
   if (pathname === "/api/qimmiq" && method === "POST") return qimmiq(request, env);
   if (pathname === "/api/qimmiq/copilot" && method === "POST") return qimmiqCopilot(request, env, rawEnv);
+  if (pathname === "/api/account/signup" && method === "POST") return signup(request, env, rawEnv);
+  if (pathname === "/api/account/login" && method === "POST") return clientLogin(request, env, rawEnv);
+  if (pathname === "/api/account" && method === "GET") return currentAccount(request, env, rawEnv);
+  if (pathname === "/api/account/logout" && method === "POST") return json({ ok: true }, 200, { "set-cookie": `${CLIENT_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
   if (pathname === "/api/bookings" && method === "POST") return createBooking(request, rawEnv);
   if (pathname === "/api/bookings" && method === "GET") return listBookings(request, rawEnv);
   const bookingPath = /^\/api\/bookings\/(appt-[a-z0-9-]+)$/i.exec(pathname);

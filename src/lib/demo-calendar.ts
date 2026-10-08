@@ -48,7 +48,7 @@ export function buildDemoCalendar(now = new Date()): string {
       `DTEND;TZID=${TZ}:${localStamp(date, start + STOP_MINUTES)}`,
       `SUMMARY:${escapeText(`${stop.pet} (${stop.breed}) · ${stop.svc}`)}`,
       `LOCATION:${escapeText(stop.address)}`,
-      `DESCRIPTION:${escapeText(`Van #1 · Groomer Sarah · ${stop.status}`)}`,
+      `DESCRIPTION:${escapeText(`Van #1 · Groomer Angelica · ${stop.status}`)}`,
       "END:VEVENT",
     ].join("\r\n");
   });

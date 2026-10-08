@@ -6,13 +6,15 @@ import {
   Gift, Star, Trophy, Smartphone, Download, Scissors, Share2, Copy, ExternalLink, HelpCircle, Camera, PawPrint
 } from "lucide-react";
 import barnaby from "@/assets/barnaby.jpg";
+import vanPhoto from "@/assets/gallery/gallery-van-exterior.jpg";
+import { DEMO_CLIENT_EMAIL, clientLogin, clientLogout, clientSignup, getClientAccount, type ClientAccount, type ClientProfile } from "@/lib/client-account";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { dispatchNotification } from "@/lib/notifications";
 import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 import { looksLikeStaffEmail, staffLogin } from "@/lib/staff-session";
 import { SERVICES, SERVICE_IDS, ADDONS, type ServiceId } from "@/lib/pricing";
-import { TIME_WINDOWS, addDays, createAppointment, formatDate, priceFor, torontoToday } from "@/lib/appointments";
+import { TIME_WINDOWS, addDays, createAppointment, formatDate, priceFor, torontoToday, type AppointmentStatus } from "@/lib/appointments";
 
 interface PetProfile {
   id: string;
@@ -60,7 +62,7 @@ const PAST_GROOMS = [
     date: "Sep 12, 2026",
     package: "Premium Full Groom (Teddy Cut)",
     price: `$${priceFor("full", PET_BREED, PET_WEIGHT_LBS)} CAD`,
-    groomer: "Sarah M.",
+    groomer: "Angelica",
     report: { coat: "Silky & Mat-Free", ears: "Cleansed & Plucked", nails: "Clipped & Buffed", mood: "Happy Angel ⭐" },
     notes: "Barnaby was a delight! Gentle conditioning treatment applied for sensitive skin.",
   },
@@ -68,11 +70,41 @@ const PAST_GROOMS = [
     date: "Aug 08, 2026",
     package: "Bath & Tidy + Blueberry Facial",
     price: `$${priceFor("tidy", PET_BREED, PET_WEIGHT_LBS) + FACIAL_PRICE} CAD`,
-    groomer: "Sarah M.",
+    groomer: "Angelica",
     report: { coat: "Fresh & Fluffed", ears: "Clean", nails: "Buffed Smooth", mood: "Calm & Relaxed" },
     notes: "Summer heat de-shedding and paw pad balm applied.",
   },
 ];
+
+/** A registered pet parent's dog: the details they gave at sign-up, the rest filled in by the groomer later. */
+function newPetProfile(p: ClientProfile): PetProfile {
+  return {
+    id: `FP-${p.createdAt.slice(2, 10).split("-").join("")}`,
+    name: p.pet.name,
+    breed: p.pet.breed,
+    weight: `${p.pet.weightLbs} lbs`,
+    favoriteCut: "To be noted at the first visit",
+    coatType: "To be noted at the first visit",
+    photo: vanPhoto,
+    tags: [],
+    vaccines: {
+      rabies: { exp: "Not uploaded yet", status: "warning" },
+      bordetella: { exp: "Not uploaded yet", status: "warning" },
+      dhpp: { exp: "Not uploaded yet", status: "warning" },
+    },
+    latchkeyCode: "",
+    latchkeyNotes: "",
+  };
+}
+
+const STATUS_LABEL: Record<AppointmentStatus, string> = {
+  requested: "Awaiting confirmation",
+  confirmed: "Confirmed",
+  en_route: "Van on the way",
+  in_progress: "In the tub",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
 
 const STAGES = [
   { label: "En Route", sub: "14 min away", icon: Navigation },
@@ -93,6 +125,14 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [loginPassword, setLoginPassword] = useState("demo-pass");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+
+  // Real pet-parent account (checked by the server); null while using the sample demo account.
+  const [account, setAccount] = useState<ClientAccount | null>(null);
+  const [signupPetName, setSignupPetName] = useState("");
+  const [signupPetBreed, setSignupPetBreed] = useState("");
+  const [signupPetWeight, setSignupPetWeight] = useState("30");
+  const petBreed = account ? account.profile.pet.breed : PET_BREED;
+  const petWeightLbs = account ? account.profile.pet.weightLbs : PET_WEIGHT_LBS;
 
   const [activeTab, setActiveTab] = useState<"overview" | "book" | "vaccines" | "history" | "rewards" | "matting" | "vip">("overview");
   const [pet, setPet] = useState<PetProfile>(DEFAULT_PET);
@@ -115,13 +155,51 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [bookingPackage, setBookingPackage] = useState<ServiceId>("full");
   const [bookingRef, setBookingRef] = useState<string | null>(null);
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const bookingPrice = priceFor(bookingPackage, PET_BREED, PET_WEIGHT_LBS);
+  const bookingPrice = priceFor(bookingPackage, petBreed, petWeightLbs);
   const [bookingPayment, setBookingPayment] = useState<"card" | "apple_pay" | "google_pay" | "interac">("apple_pay");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
 
   // VIP Subscription state
   const [vipCycle, setVipCycle] = useState<4 | 6 | 8>(4);
   const [vipActive, setVipActive] = useState(true);
+
+  const enterWithAccount = (acc: ClientAccount) => {
+    const p = acc.profile;
+    setAccount(acc);
+    setUserName(p.name);
+    setUserEmail(p.email);
+    setUserPhone(p.phone);
+    setUserAddress(p.address);
+    setPet(newPetProfile(p));
+    setCodeDraft("");
+    // 1 Paw Point per dollar of completed grooms
+    setPawPoints(acc.bookings.filter((b) => b.status === "completed").reduce((sum, b) => sum + b.total, 0));
+    setVipActive(false);
+    setIsAuthenticated(true);
+  };
+
+  useEffect(() => {
+    getClientAccount().then((acc) => {
+      if (acc) enterWithAccount(acc);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const historyItems = account
+    ? account.bookings.map((b) => ({
+        date: formatDate(b.date),
+        package: SERVICES[b.service].name,
+        price: `$${b.total} CAD`,
+        groomer: b.status === "completed" ? "Angelica" : STATUS_LABEL[b.status],
+        report: {
+          coat: b.report?.coat ?? "Pending",
+          ears: b.report?.ears ?? "Pending",
+          nails: b.report?.nails ?? "Pending",
+          mood: b.report?.temperament ?? STATUS_LABEL[b.status],
+        },
+        notes: b.report?.notes ?? (b.status === "requested" ? "Request received. We will confirm your exact time." : `${b.timeWindow ?? b.time} visit.`),
+      }))
+    : PAST_GROOMS;
 
   useEffect(() => {
     if (!autoStage) return;
@@ -164,7 +242,32 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     }
                     return;
                   }
-                  setIsAuthenticated(true);
+                  if (authMode === "login" && userEmail.trim().toLowerCase() === DEMO_CLIENT_EMAIL) {
+                    // the sample pet parent: full demo portal, no server account
+                    setIsAuthenticated(true);
+                    return;
+                  }
+                  setSigningIn(true);
+                  try {
+                    const acc =
+                      authMode === "signup"
+                        ? await clientSignup({
+                            name: userName,
+                            email: userEmail,
+                            password: loginPassword,
+                            phone: userPhone,
+                            address: userAddress,
+                            petName: signupPetName,
+                            petBreed: signupPetBreed,
+                            petWeightLbs: Number(signupPetWeight),
+                          })
+                        : await clientLogin(userEmail, loginPassword);
+                    enterWithAccount(acc);
+                  } catch (err) {
+                    setLoginError(err instanceof Error ? err.message : "Sign-in failed.");
+                  } finally {
+                    setSigningIn(false);
+                  }
                 }}
                 className="mt-6 space-y-4"
               >
@@ -203,6 +306,26 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   />
                 </div>
                 {authMode === "signup" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">Mobile Phone</label>
+                      <input type="tel" required value={userPhone} onChange={(e) => setUserPhone(e.target.value)} placeholder="(416) 555-0123" className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">Dog's Name</label>
+                      <input type="text" required value={signupPetName} onChange={(e) => setSignupPetName(e.target.value)} placeholder="e.g. Milo" className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">Breed</label>
+                      <input type="text" required value={signupPetBreed} onChange={(e) => setSignupPetBreed(e.target.value)} placeholder="e.g. Goldendoodle" className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">Weight (lbs)</label>
+                      <input type="number" required min={2} max={250} value={signupPetWeight} onChange={(e) => setSignupPetWeight(e.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-teal" />
+                    </div>
+                  </div>
+                )}
+                {authMode === "signup" && (
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground">Toronto Service Address</label>
                     <input
@@ -217,6 +340,11 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 )}
 
                 {loginError && <p className="text-xs font-semibold text-destructive">{loginError}</p>}
+                {authMode === "login" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Just looking? The sample account <strong>{DEMO_CLIENT_EMAIL}</strong> (password <strong>demo-pass</strong>) opens a portal full of example data.
+                  </p>
+                )}
                 <button
                   type="submit"
                   disabled={signingIn}
@@ -230,7 +358,18 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               <div className="mt-4 border-t border-border pt-3 text-center">
                 <button
                   type="button"
-                  onClick={() => setAuthMode(authMode === "login" ? "signup" : "login")}
+                  onClick={() => {
+                    setLoginError(null);
+                    if (authMode === "login") {
+                      // start the sign-up form empty instead of with the sample pet parent
+                      setUserName("");
+                      setUserEmail("");
+                      setUserPhone("");
+                      setUserAddress("");
+                      setLoginPassword("");
+                    }
+                    setAuthMode(authMode === "login" ? "signup" : "login");
+                  }}
                   className="text-xs font-semibold text-teal hover:underline"
                 >
                   {authMode === "login"
@@ -341,7 +480,18 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
             <Calendar className="h-3.5 w-3.5" /> Book Appointment (No MoeGo needed)
           </button>
           <button
-            onClick={() => setIsAuthenticated(false)}
+            onClick={() => {
+              if (account) {
+                void clientLogout();
+                setAccount(null);
+                setPet(DEFAULT_PET);
+                setPawPoints(380);
+                setVipActive(true);
+                setUserEmail(DEMO_CLIENT_EMAIL);
+                setLoginPassword("");
+              }
+              setIsAuthenticated(false);
+            }}
             className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-destructive"
           >
             <LogOut className="h-3.5 w-3.5" /> Log Out
@@ -543,7 +693,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 >
                   <Truck className="h-5 w-5 text-gold" />
                 </div>
-                <Pill tone="ink" className="absolute left-3 top-3">Live • Van #1 (Groomer Sarah)</Pill>
+                <Pill tone="ink" className="absolute left-3 top-3">{account ? "Preview • live tracking on visit day" : "Live • Van #1 (Groomer Angelica)"}</Pill>
               </div>
               <div className="p-5">
                 <div className="flex items-center justify-between">
@@ -611,21 +761,21 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/20 text-success">
                 <CheckCircle2 className="h-10 w-10" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-ink">Appointment Confirmed!</h3>
+              <h3 className="font-serif text-2xl font-bold text-ink">Booking Request Sent!</h3>
               <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                Booking reference <strong>#{bookingRef}</strong> has been locked into Van #1's route for <strong>{formatDate(bookingDate)}</strong> during the <strong>{bookingSlot}</strong> window.
+                Reference <strong>#{bookingRef}</strong> for <strong>{formatDate(bookingDate)}</strong>, <strong>{bookingSlot}</strong> window. The owner gets an alert right away and confirms your exact time.
               </p>
               <div className="rounded-2xl border border-border bg-secondary/50 p-4 text-xs max-w-sm mx-auto text-left space-y-2">
                 <div><strong>Dog:</strong> {pet.name} ({pet.breed})</div>
                 <div><strong>Package:</strong> {SERVICES[bookingPackage].name} • ${bookingPrice} CAD</div>
                 <div><strong>Location:</strong> {userAddress}</div>
                 <div><strong>Payment Method:</strong> <span className="uppercase font-bold text-teal">{bookingPayment}</span> (CAD)</div>
-                <div><strong>Latchkey Access:</strong> Authorized (Code {pet.latchkeyCode})</div>
+                {pet.latchkeyCode && <div><strong>Latchkey Access:</strong> Authorized (shown to your groomer on the day)</div>}
               </div>
 
               <div className="pt-2">
                 <a
-                  href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just confirmed appointment #${bookingRef} for ${pet.name} (${SERVICES[bookingPackage].name}) on ${bookingDate} (${bookingSlot}) at ${userAddress}. Payment: ${bookingPayment}.`)}`}
+                  href={`https://wa.me/16474511747?text=${encodeURIComponent(`Hello The Fresh Pooch! I just requested appointment #${bookingRef} for ${pet.name} (${SERVICES[bookingPackage].name}) on ${bookingDate} (${bookingSlot}) at ${userAddress}. Payment: ${bookingPayment}.`)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:opacity-90 transition"
@@ -657,8 +807,8 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 try {
                   const appt = await createAppointment({
                     petName: pet.name,
-                    breed: PET_BREED,
-                    weightLbs: PET_WEIGHT_LBS,
+                    breed: petBreed,
+                    weightLbs: petWeightLbs,
                     service: bookingPackage,
                     date: bookingDate,
                     time: TIME_WINDOWS.find((w) => w.label === bookingSlot)?.start ?? "8:30 AM",
@@ -670,9 +820,11 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     notes: pet.latchkeyNotes,
                     paymentMethod: bookingPayment,
                     source: "portal",
+                    status: "requested",
                   });
                   setBookingRef(appt.reference);
                   setBookingConfirmed(true);
+                  if (account) getClientAccount().then((acc) => acc && setAccount(acc));
                   await dispatchNotification("booking_confirmed", "whatsapp", {
                     toPhone: userPhone,
                     clientName: userName,
@@ -819,7 +971,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 type="submit"
                 className="w-full rounded-full bg-gradient-gold py-3 text-sm font-bold text-ink shadow-lift transition-transform hover:scale-[1.01]"
               >
-                Confirm Booking & Dispatch Van #1 • ${bookingPrice} CAD
+                Request Booking • ${bookingPrice} CAD
               </button>
               {bookingError && <p className="text-center text-xs font-semibold text-destructive">{bookingError}</p>}
             </form>
@@ -915,7 +1067,12 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
           </div>
 
           <div className="space-y-4">
-            {PAST_GROOMS.map((g, idx) => (
+            {historyItems.length === 0 && (
+              <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No visits yet. Your bookings and report cards will appear here.
+              </p>
+            )}
+            {historyItems.map((g, idx) => (
               <div key={idx} className="rounded-2xl border border-border bg-card p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/80 pb-3">
                   <div>
@@ -1000,7 +1157,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
               <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-gold" /> 15% Lifetime Discount applied automatically</li>
               <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-gold" /> Free Organic Blueberry Facial included</li>
               <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-gold" /> Free Winter Road Salt Paw Wax massage</li>
-              <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-gold" /> Same dedicated master groomer (Sarah)</li>
+              <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-gold" /> Same dedicated groomer every visit</li>
             </ul>
           </div>
 
@@ -1081,7 +1238,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   id: "free_groom",
                   title: "100% Free Full Spa Groom Visit",
                   cost: 750,
-                  val: `$${priceFor("full", PET_BREED, PET_WEIGHT_LBS)} CAD value`,
+                  val: `$${priceFor("full", petBreed, petWeightLbs)} CAD value`,
                   desc: "Complete head-to-paw luxury grooming package in our heated mobile van.",
                 },
               ].map((r) => {
@@ -1296,7 +1453,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
           {/* Expert Toronto Groomer Rules */}
           <div className="rounded-2xl bg-secondary/50 p-5 border border-border">
             <h4 className="font-bold text-sm text-ink mb-3 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-teal" /> Sarah's Golden Rules for Toronto Winter Coat Care
+              <ShieldCheck className="h-4 w-4 text-teal" /> Our Golden Rules for Toronto Winter Coat Care
             </h4>
             <div className="grid sm:grid-cols-3 gap-4 text-xs text-muted-foreground">
               <div className="space-y-1">

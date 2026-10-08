@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   TrendingUp, CalendarDays, DollarSign, Users, Truck, Star, ArrowUpRight, ArrowDownRight, MapPin, Fuel, Wrench,
-  KeyRound, LogOut, ShieldCheck, Key, AlertCircle, User,
+  KeyRound, LogOut, ShieldCheck, Key, AlertCircle, User, Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle } from "./primitives";
@@ -81,12 +81,49 @@ export function AdminSurface({
     }
   };
 
-  const { appointments } = useAppointments();
+  const { appointments, loaded } = useAppointments();
   const today = torontoToday();
   const kpi = useMemo(() => monthKpis(appointments, today), [appointments, today]);
   const WEEK = useMemo(() => weekBars(appointments, today), [appointments, today]);
   const ZONES = useMemo(() => zoneCoverage(appointments, today), [appointments, today]);
   const upcoming = useMemo(() => upcomingBookings(appointments, today), [appointments, today]);
+  const pending = useMemo(() => upcoming.filter((a) => a.status === "requested"), [upcoming]);
+
+  // Booking alerts: requests that arrive while the dashboard is open (it refreshes every 20 s).
+  const seenRequests = useRef<Set<string> | null>(null);
+  const [newRequests, setNewRequests] = useState(0);
+  const [alertsOn, setAlertsOn] = useState(false);
+  useEffect(() => {
+    setAlertsOn(typeof Notification !== "undefined" && Notification.permission === "granted");
+  }, []);
+  useEffect(() => {
+    if (!isAuthenticated || !loaded) return;
+    if (seenRequests.current === null) {
+      seenRequests.current = new Set(pending.map((a) => a.id));
+      return;
+    }
+    const fresh = pending.filter((a) => !seenRequests.current!.has(a.id));
+    if (!fresh.length) return;
+    fresh.forEach((a) => seenRequests.current!.add(a.id));
+    setNewRequests((n) => n + fresh.length);
+    if (alertsOn) {
+      const a = fresh[0]!;
+      new Notification("New booking request", { body: `${a.petName} · ${serviceName(a.service)} · ${formatDate(a.date)}`, tag: a.id });
+    }
+  }, [pending, isAuthenticated, loaded, alertsOn]);
+  useEffect(() => {
+    if (!isAuthenticated || typeof document === "undefined") return;
+    const original = document.title;
+    if (pending.length) document.title = `(${pending.length}) To confirm · ${original}`;
+    return () => {
+      document.title = original;
+    };
+  }, [pending.length, isAuthenticated]);
+  const enableAlerts = async () => {
+    if (typeof Notification === "undefined") return;
+    setAlertsOn((await Notification.requestPermission()) === "granted");
+  };
+
   const KPIS = [
     { label: `Revenue (${kpi.monthLabel})`, value: money(kpi.revenue), delta: changeLabel(kpi.revenueChange), up: (kpi.revenueChange ?? 0) >= 0, icon: DollarSign },
     { label: "Grooms Completed", value: String(kpi.grooms), delta: changeLabel(kpi.groomsChange), up: (kpi.groomsChange ?? 0) >= 0, icon: CalendarDays },
@@ -208,9 +245,9 @@ export function AdminSurface({
             <button
               onClick={onViewGroomer}
               className="flex items-center gap-1.5 rounded-lg border border-teal/40 bg-card px-3 py-1.5 text-xs font-semibold text-teal hover:bg-teal hover:text-white transition shadow-sm"
-              title="Supervise Groomer Sarah's Mobile Van Field App"
+              title="Supervise Groomer Angelica's Mobile Van Field App"
             >
-              <Truck className="h-3.5 w-3.5" /> Van #1 Groomer Field App (Sarah)
+              <Truck className="h-3.5 w-3.5" /> Van #1 Groomer Field App (Angelica)
             </button>
           )}
           <button
@@ -226,6 +263,16 @@ export function AdminSurface({
           </button>
         </div>
       </div>
+
+      {newRequests > 0 && (
+        <div role="status" className="animate-fade-up mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-gold/15 px-5 py-3 text-sm">
+          <span className="flex items-center gap-2 font-semibold"><Bell className="h-4 w-4 text-gold" /> {newRequests === 1 ? "A new booking request just arrived." : `${newRequests} new booking requests just arrived.`}</span>
+          <span className="flex gap-2">
+            <a href="#upcoming-bookings" onClick={() => setNewRequests(0)} className="rounded-full bg-ink px-4 py-1.5 text-xs font-bold text-ink-foreground">Review now</a>
+            <button onClick={() => setNewRequests(0)} className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Dismiss</button>
+          </span>
+        </div>
+      )}
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -317,10 +364,20 @@ export function AdminSurface({
         </div>
       </div>
 
-      <div className="card-surface mt-6 p-6">
+      <div id="upcoming-bookings" className="card-surface mt-6 scroll-mt-24 p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-2xl font-semibold">Upcoming bookings</h2>
-          <Pill tone="muted">From the portal, the online quote and Qimmiq · any device</Pill>
+          <h2 className="flex items-center gap-2 text-2xl font-semibold">
+            Upcoming bookings
+            {pending.length > 0 && <Pill tone="gold">{pending.length} to confirm</Pill>}
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone="muted">From the portal, the online quote and Qimmiq · any device</Pill>
+            {typeof Notification !== "undefined" && (
+              <button onClick={enableAlerts} disabled={alertsOn} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold", alertsOn ? "border-success/40 text-success" : "border-border hover:border-teal hover:text-teal")}>
+                <Bell className="h-3.5 w-3.5" /> {alertsOn ? "Booking alerts on" : "Turn on booking alerts"}
+              </button>
+            )}
+          </div>
         </div>
         {upcoming.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No new bookings yet. Bookings made in the Customer Portal or the instant quote appear here.</p>

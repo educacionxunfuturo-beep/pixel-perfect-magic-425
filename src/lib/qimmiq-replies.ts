@@ -39,7 +39,7 @@ const TIER: Record<NonNullable<ReplyEntities["breedTier"]>, WeightTierId> = { sm
 const CARD_COPY: Record<ServiceId, { icon: string; badge: [string, string]; highlights: [string, string] }> = {
   tidy: { icon: "🛁", badge: ["No haircut", "Sin corte"], highlights: ["Warm hydrobath, hand dry, nails & ears", "Hidrobaño tibio, secado a mano, uñas y oídos"] },
   full: { icon: "✂️", badge: ["Most popular", "El más pedido"], highlights: ["Full breed haircut, bath & nails", "Corte completo de raza, baño y uñas"] },
-  ultimate: { icon: "✨", badge: ["Full luxury", "Lujo total"], highlights: ["De-shedding blowout, haircut, facial & paw balm", "Deslanado profundo, corte, facial y bálsamo"] },
+  ultimate: { icon: "✨", badge: ["Full luxury", "Lujo total"], highlights: ["Haircut, teeth, glands, facial & pad care", "Corte, dientes, glándulas, facial y almohadillas"] },
 };
 
 const FACIAL = ADDONS.find((a) => a.id === "facial")!;
@@ -171,8 +171,8 @@ export function differenceReply(lang: ReplyLang, e: ReplyEntities): Reply {
   return {
     text: T(
       lang,
-      `Here is the difference:\n\n• 🛁 **Bath & Tidy (${servicePrice("tidy", e).label} CAD):** hygiene and coat care: bath, hand dry, brush-out, nails and ears. **No haircut.**\n• ✂️ **Premium Full Groom (${servicePrice("full", e).label} CAD):** everything in Bath & Tidy **plus a full breed haircut** and hand-scissor styling.\n• ✨ **Ultimate Spa (${servicePrice("ultimate", e).label} CAD):** the full groom plus an intensive de-shedding blowout, blueberry facial and paw balm.`,
-      `Esta es la diferencia:\n\n• 🛁 **Bath & Tidy (${servicePrice("tidy", e).label} CAD):** higiene y cuidado del pelaje: baño, secado a mano, cepillado, uñas y oídos. **Sin corte.**\n• ✂️ **Premium Full Groom (${servicePrice("full", e).label} CAD):** todo lo de Bath & Tidy **más un corte completo de raza** a tijera.\n• ✨ **Ultimate Spa (${servicePrice("ultimate", e).label} CAD):** el corte completo más deslanado intensivo, facial de arándanos y bálsamo de patas.`,
+      `Here is the difference:\n\n• 🛁 **Bath & Tidy (${servicePrice("tidy", e).label} CAD):** hygiene and coat care: bath, hand dry, brush-out, nails and ears. **No haircut.**\n• ✂️ **Premium Full Groom (${servicePrice("full", e).label} CAD):** everything in Bath & Tidy **plus a full breed haircut** and hand-scissor styling.\n• ✨ **Ultimate Spa (${servicePrice("ultimate", e).label} CAD):** the full groom with scissoring, plus teeth brushing, gland expression, blueberry facial and pad moisturizing.`,
+      `Esta es la diferencia:\n\n• 🛁 **Bath & Tidy (${servicePrice("tidy", e).label} CAD):** higiene y cuidado del pelaje: baño, secado a mano, cepillado, uñas y oídos. **Sin corte.**\n• ✂️ **Premium Full Groom (${servicePrice("full", e).label} CAD):** todo lo de Bath & Tidy **más un corte completo de raza** a tijera.\n• ✨ **Ultimate Spa (${servicePrice("ultimate", e).label} CAD):** el corte completo a tijera, más cepillado de dientes, vaciado de glándulas, facial de arándanos e hidratación de almohadillas.`,
     ),
     actionItems: [card("tidy", lang, e, "diff"), card("full", lang, e, "diff")],
   };

@@ -13,8 +13,8 @@ export type AddonId = "salt" | "facial" | "shed";
 
 export const SERVICES: Record<ServiceId, { name: string; floor: number; adjust: number; published: string }> = {
   tidy: { name: "Bath & Tidy", floor: 130, adjust: -10, published: "From $130" },
-  full: { name: "Premium Full Groom", floor: 140, adjust: 0, published: "$140 – $250" },
-  ultimate: { name: "The Ultimate Spa Experience", floor: 260, adjust: 100, published: "$260 – $290+" },
+  full: { name: "Premium Full Groom", floor: 140, adjust: 0, published: "From $140" },
+  ultimate: { name: "The Ultimate Spa Experience", floor: 290, adjust: 100, published: "From $290" },
 };
 
 export const SERVICE_IDS: ServiceId[] = ["tidy", "full", "ultimate"];

@@ -4,15 +4,17 @@ import { Check, Star, ChevronDown, Newspaper, ShieldCheck, Leaf, Award, Phone, M
 import { cn } from "@/lib/utils";
 import { Pill, SectionTitle, BrandLogo } from "./primitives";
 import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
+import vanCollage from "@/assets/fresh-pooch-van-collage.jpg";
 
 export type PackageId = "tidy" | "full" | "ultimate";
 export const PACKAGES: { id: PackageId; name: string; price: string; from: number; best: string; includes: string[]; popular?: boolean }[] = [
-  { id: "tidy", name: SERVICES.tidy.name, price: SERVICES.tidy.published, from: SERVICES.tidy.floor, best: "Short coats, routine hygiene, and between-haircut freshness.",
-    includes: ["Double shampoo with 100% organic botanical washes", "Warm conditioning rinse", "Hand blow-dry (100% cage-free)", "Nail clipping & buffing", "Ear cleansing", "Pad trim & sanitary hygiene tidy"] },
-  { id: "full", name: SERVICES.full.name, price: SERVICES.full.published, from: SERVICES.full.floor, popular: true, best: "Breeds requiring haircuts (Doodles, Maltese, Shih Tzus, Poodles).",
-    includes: ["Everything in Bath & Tidy", "Full body precision styling (Teddy Bear, Puppy Cut, or breed standard)", "Facial fluffing", "Paw pad treatment", "Artisan cologne spritz"] },
-  { id: "ultimate", name: SERVICES.ultimate.name, price: SERVICES.ultimate.published, from: SERVICES.ultimate.floor, best: "Double-coated or luxury pampering (Golden Retrievers, Huskies, Bernedoodles).",
-    includes: ["Full Groom", "Intensive De-Shedding & undercoat blowout", "Deep Organic Blueberry Facial", "Soothing paw balm massage", "Fresh enzymatic breath spray"] },
+  // Contents and durations as published on doggroomingtoronto.ca (Oct 2026); price varies with breed, coat type and weight.
+  { id: "tidy", name: SERVICES.tidy.name, price: SERVICES.tidy.published, from: SERVICES.tidy.floor, best: "About 1 hour. Short coats and freshness between haircuts.",
+    includes: ["10-min jet massage bath with 100% organic, hypoallergenic shampoo & conditioner", "Blow dry with soft infusing hair treatment (variable speed)", "Ear cleaning", "Fur and hair brushing", "Nail clipping", "A complimentary trendy bandana or tie"] },
+  { id: "full", name: SERVICES.full.name, price: SERVICES.full.published, from: SERVICES.full.floor, popular: true, best: "About 1.5 hours. Breeds that need a haircut (Doodles, Maltese, Shih Tzus, Poodles).",
+    includes: ["Everything in Bath & Tidy", "Styled haircut for your dog's breed", "Ear cleaning and plucking", "Trimming around sanitary areas", "A complimentary trendy bandana or tie"] },
+  { id: "ultimate", name: SERVICES.ultimate.name, price: SERVICES.ultimate.published, from: SERVICES.ultimate.floor, best: "1.5 to 2 hours. The full pampering, done by a pro Toronto groomer.",
+    includes: ["20-min jet massage bath, blow dry and brushing", "Styled breed haircut including scissoring work", "Nail clipping, ear cleaning and plucking", "Teeth brushing and gland expression", "Blueberry facial", "Pad moisturizing for dry or cracked pads"] },
 ];
 
 export function Packages({ onSelect }: { onSelect: (id: PackageId) => void }) {
@@ -46,7 +48,7 @@ export function PressBanner() {
         <div className="eyebrow flex items-center gap-2 text-gold"><Newspaper className="h-4 w-4" /> Trusted by Toronto Pet Parents & Featured on BlogTO</div>
         <p className="max-w-3xl font-serif text-xl italic md:text-2xl">"The vintage spa trailer famously visited by Adam Sandler in Toronto for his bulldog Bagel's luxury groom."</p>
         <div className="flex flex-wrap justify-center gap-2 text-xs font-semibold">
-          {[{ i: Award, t: "Fear-Free Certified Standards" }, { i: Leaf, t: "100% Self-Sufficient Eco-Van" }, { i: ShieldCheck, t: "Ontario Licensed & Insured" }].map(({ i: I, t }) => (
+          {[{ i: Award, t: "3,500+ Services Since 2019" }, { i: Leaf, t: "100% Organic, Hypoallergenic Shampoo" }, { i: ShieldCheck, t: "1-on-1, Cage-Free, at Your Door" }].map(({ i: I, t }) => (
             <span key={t} className="flex items-center gap-1.5 rounded-full border border-gold/40 px-3 py-1.5"><I className="h-3.5 w-3.5 text-gold" />{t}</span>
           ))}
         </div>
@@ -86,6 +88,19 @@ export function Reviews() {
         <a href="https://instagram.com/thefreshpooch" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-teal/30 bg-card px-5 py-2.5 text-sm font-semibold text-teal hover:border-teal hover:bg-teal/5 transition-colors"><Instagram className="h-4 w-4" /> Real stories @thefreshpooch</a>
       </div>
     </div>
+  );
+}
+
+/** Photo collage from the business's Facebook page: a freshly groomed pup and the groomer by the van. */
+export function VanMoments() {
+  return (
+    <figure className="card-surface mt-6 overflow-hidden p-0">
+      <img src={vanCollage} alt="A freshly groomed white pup in a tropical bandana, held by a smiling groomer next to The Fresh Pooch van" loading="lazy" className="aspect-square w-full object-cover" />
+      <figcaption className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+        <span><strong>Fresh from the van.</strong> <span className="text-muted-foreground">Groomed at the curb, back home in minutes.</span></span>
+        <span className="shrink-0 text-xs font-semibold text-teal">Toronto</span>
+      </figcaption>
+    </figure>
   );
 }
 

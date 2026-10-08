@@ -145,7 +145,7 @@ export function GroomerSurface({ onBackToAdmin }: { onBackToAdmin?: () => void }
       )}
       <div className="bg-gradient-teal trailer-rivets mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-6 py-5 text-primary-foreground">
         <div>
-          <div className="eyebrow text-gold">Van #1 • Groomer Sarah</div>
+          <div className="eyebrow text-gold">Van #1 • Groomer Angelica</div>
           <h1 className="text-2xl font-semibold md:text-3xl">
             Today: {route.day} • {route.area} route • {stops.length} {stops.length === 1 ? "Appointment" : "Appointments"}
           </h1>

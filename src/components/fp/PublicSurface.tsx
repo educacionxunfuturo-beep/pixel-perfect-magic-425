@@ -7,7 +7,7 @@ import beforeImg from "@/assets/before.jpg";
 import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
-import { Packages, PressBanner, Reviews, Faq, PACKAGES, type PackageId } from "./PublicSections";
+import { Packages, PressBanner, Reviews, VanMoments, Faq, PACKAGES, type PackageId } from "./PublicSections";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { PetParentAppSection } from "./PetParentAppSection";
 import { SpaReels } from "./SpaReels";
@@ -395,6 +395,7 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
           <div>
             <SectionTitle eyebrow="The Transformation" title="Slide to see the magic" sub="Real results from our trailer tub. Welsh Terrier full groom & scissor styling." />
             <BeforeAfter />
+            <VanMoments />
           </div>
           <Reviews />
         </div>

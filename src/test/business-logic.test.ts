@@ -160,22 +160,34 @@ describe("owner copilot snapshot", () => {
 describe("shared bookings (server, D1)", () => {
   // Minimal in-memory stand-in for the D1 binding
   function fakeD1() {
-    const rows = new Map<string, { id: string; date: string; data: string }>();
+    const rows = new Map<string, { id: string; date: string; data: string; customer_email: string | null }>();
+    const customers = new Map<string, { email: string; data: string; password_hash: string; salt: string }>();
     return {
       rows,
+      customers,
       prepare(sql: string) {
         return {
           bind(...v: unknown[]) {
             return {
               async run() {
-                if (sql.startsWith("INSERT OR IGNORE") && !rows.has(String(v[0]))) rows.set(String(v[0]), { id: String(v[0]), date: String(v[1]), data: String(v[2]) });
+                let changes = 0;
+                if (sql.startsWith("INSERT OR IGNORE INTO bookings") && !rows.has(String(v[0]))) {
+                  rows.set(String(v[0]), { id: String(v[0]), date: String(v[1]), data: String(v[2]), customer_email: (v[5] as string | null) ?? null });
+                  changes = 1;
+                }
+                if (sql.startsWith("INSERT OR IGNORE INTO customers") && !customers.has(String(v[0]))) {
+                  customers.set(String(v[0]), { email: String(v[0]), data: String(v[1]), password_hash: String(v[2]), salt: String(v[3]) });
+                  changes = 1;
+                }
                 if (sql.startsWith("UPDATE")) rows.get(String(v[2]))!.data = String(v[0]);
-                return {};
+                return { meta: { changes } };
               },
               async all<T>() {
+                if (sql.includes("customer_email = ?")) return { results: [...rows.values()].filter((r) => r.customer_email === v[0]) as T[] };
                 return { results: [...rows.values()].filter((r) => r.date >= String(v[0])) as T[] };
               },
               async first<T>() {
+                if (sql.includes("FROM customers")) return (customers.get(String(v[0])) ?? null) as T | null;
                 return (rows.get(String(v[0])) ?? null) as T | null;
               },
             };
@@ -214,5 +226,39 @@ describe("shared bookings (server, D1)", () => {
     const env = { BOOKINGS_DB: fakeD1() };
     const bad = await handleApi(req("/api/bookings", { method: "POST", body: JSON.stringify({ ...booking, id: "x'; DROP", date: "tomorrow" }) }), env);
     expect(bad!.status).toBe(400);
+  });
+
+  it("creates pet-parent accounts with hashed passwords and links their bookings", async () => {
+    const db = fakeD1();
+    const env = { STAFF_PASSWORD: "s3cret", BOOKINGS_DB: db };
+    const signupBody = { name: "Alex P.", email: "alex@example.com", password: "woofwoof1", phone: "416-555-0101", address: "1 Main St", petName: "Milo", petBreed: "Goldendoodle", petWeightLbs: 30 };
+    const signedUp = await handleApi(req("/api/account/signup", { method: "POST", body: JSON.stringify(signupBody) }), env);
+    expect(signedUp!.status).toBe(200);
+    expect(db.customers.get("alex@example.com")!.password_hash).not.toContain("woofwoof1");
+    const cookie = signedUp!.headers.get("set-cookie")!.split(";")[0]!;
+    expect(cookie).toMatch(/^fp_client=/);
+
+    const again = await handleApi(req("/api/account/signup", { method: "POST", body: JSON.stringify(signupBody) }), env);
+    expect(again!.status).toBe(409);
+    const wrong = await handleApi(req("/api/account/login", { method: "POST", body: JSON.stringify({ email: "alex@example.com", password: "nope-nope" }) }), env);
+    expect(wrong!.status).toBe(401);
+    const right = await handleApi(req("/api/account/login", { method: "POST", body: JSON.stringify({ email: "alex@example.com", password: "woofwoof1" }) }), env);
+    expect(right!.status).toBe(200);
+
+    await handleApi(req("/api/bookings", { method: "POST", headers: { cookie }, body: JSON.stringify({ ...booking, id: "appt-alex-1" }) }), env);
+    const me = await handleApi(req("/api/account", { headers: { cookie } }), env);
+    const body = (await me!.json()) as { profile: { pet: { name: string } }; bookings: { id: string }[] };
+    expect(body.profile.pet.name).toBe("Milo");
+    expect(body.bookings.map((b) => b.id)).toEqual(["appt-alex-1"]);
+
+    // a pet-parent cookie never works as a staff session
+    const asStaff = await handleApi(req("/api/bookings", { headers: { cookie: cookie.replace("fp_client=", "fp_staff=") } }), env);
+    expect(asStaff!.status).toBe(401);
+  });
+
+  it("does not let pet parents sign up with a staff email", async () => {
+    const env = { STAFF_PASSWORD: "s3cret", BOOKINGS_DB: fakeD1() };
+    const res = await handleApi(req("/api/account/signup", { method: "POST", body: JSON.stringify({ name: "X", email: "admin@thefreshpooch.ca", password: "longenough", petName: "Rex" }) }), env);
+    expect(res!.status).toBe(400);
   });
 });

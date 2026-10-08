@@ -10,7 +10,7 @@ export const DEMO_ROUTE_STOPS = [
     address: "88 Broadway Ave, Unit 1402, Toronto M4P 1V6",
     phone: "416-555-0142",
     notes: "Concierge notified at front desk. Lockbox on bicycle rack in P1 parking (code 9142). Please ensure harness is snug.",
-    waiver: "Signed digitally (Fear-Free Handling)",
+    waiver: "Signed digitally (gentle handling)",
   },
   {
     time: "10:00 AM",

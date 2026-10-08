@@ -63,7 +63,7 @@ const PLANS: Plan[] = [
       "15% Lifetime Savings on every groom",
       "Deep hydrobath soak & botanical conditioning",
       "Nail trim & buffing, ear cleansing & sanitary hygiene",
-      "Fresh enzymatic breath spray included",
+      "Complimentary trendy bandana every visit",
       "Zero travel or downtown parking surcharges",
       "Flexible schedule — pause or skip anytime in 1 tap",
     ],
