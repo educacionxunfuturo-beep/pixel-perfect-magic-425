@@ -234,7 +234,11 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 <p className="mt-2 text-xs text-muted-foreground">
                   {authMode === "login"
                     ? "Track live grooms, manage Latchkey access & vaccine reminders."
-                    : "Register your dog for 100% cage-free mobile grooming right to your Toronto doorstep."}
+                    : authMode === "signup"
+                    ? "Register your dog for 100% cage-free mobile grooming right to your Toronto doorstep."
+                    : authMode === "forgot"
+                    ? "Enter the email of your account and we'll send you a link to choose a new password."
+                    : "Pick a new password for your account. The link works once."}
                 </p>
               </div>
 
@@ -543,9 +547,14 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 setPet(DEFAULT_PET);
                 setPawPoints(380);
                 setVipActive(true);
-                setUserEmail(DEMO_CLIENT_EMAIL);
                 setLoginPassword("");
               }
+              // back to the sign-in form (not sign-up), with the email already filled in
+              setAuthMode("login");
+              setLoginError(null);
+              setAuthNotice(null);
+              setActiveTab("overview");
+              setBookingConfirmed(false);
               setIsAuthenticated(false);
             }}
             className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-destructive"
