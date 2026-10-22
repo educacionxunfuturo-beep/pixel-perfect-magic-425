@@ -7,13 +7,13 @@ import {
 } from "lucide-react";
 import barnaby from "@/assets/barnaby.jpg";
 import vanPhoto from "@/assets/gallery/gallery-van-exterior.jpg";
-import { DEMO_CLIENT_EMAIL, clientLogin, clientLogout, clientSignup, getClientAccount, requestPasswordReset, resetPassword, saveAccess, type ClientAccount, type ClientProfile } from "@/lib/client-account";
+import { DEMO_CLIENT_EMAIL, clientLogout, portalLogin, clientSignup, getClientAccount, requestPasswordReset, resetPassword, saveAccess, type ClientAccount, type ClientProfile } from "@/lib/client-account";
 import { AccountVaccines } from "./AccountVaccines";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { dispatchNotification } from "@/lib/notifications";
 import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
-import { looksLikeStaffEmail, staffLogin } from "@/lib/staff-session";
+import { looksLikeStaffEmail, markStaffSignedIn, staffLogin } from "@/lib/staff-session";
 import { SERVICES, SERVICE_IDS, ADDONS, type ServiceId } from "@/lib/pricing";
 import { TIME_WINDOWS, addDays, createAppointment, formatDate, priceFor, torontoToday, type AppointmentStatus } from "@/lib/appointments";
 
@@ -306,7 +306,13 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                             petBreed: signupPetBreed,
                             petWeightLbs: Number(signupPetWeight),
                           })
-                        : await clientLogin(userEmail, loginPassword);
+                        : await portalLogin(userEmail, loginPassword);
+                    if ("staff" in acc) {
+                      // the owner's own email (any address): open her dashboard
+                      markStaffSignedIn();
+                      onAdminLogin?.();
+                      return;
+                    }
                     enterWithAccount(acc);
                   } catch (err) {
                     setLoginError(err instanceof Error ? err.message : "Sign-in failed.");

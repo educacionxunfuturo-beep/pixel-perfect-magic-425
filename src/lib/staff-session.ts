@@ -67,6 +67,12 @@ export async function staffLogin(email: string, password: string): Promise<void>
   refreshBookings();
 }
 
+/** The owner signed in through the portal form (any email): same follow-up as staffLogin. */
+export function markStaffSignedIn() {
+  setStaffHint(true);
+  refreshBookings();
+}
+
 export async function staffDemoLogin(): Promise<void> {
   const res = await post("/api/staff/demo-login");
   if (!res.ok) throw new Error(await errorMessage(res, "Demo access is not available."));

@@ -177,8 +177,8 @@ async function updateOwnerAccount(request: Request, env: Env, rawEnv: unknown): 
   if (!(await staffPasswordMatches(env, owner, current))) return json({ error: "The current password is not correct." }, 401);
   if (next.length < 10 || next.length > 200) return json({ error: "Choose a new password of at least 10 characters." }, 400);
   if (next === current) return json({ error: "The new password must be different from the current one." }, 400);
-  // the sign-in screen sends only business-domain emails to the staff login (looksLikeStaffEmail)
-  if (!/^[^\s@]+@(thefreshpooch\.ca|doggroomingtoronto\.ca)$/.test(email)) return json({ error: "Use an @thefreshpooch.ca or @doggroomingtoronto.ca email." }, 400);
+  // any address works: the portal sign-in recognises the owner's email (clientLogin)
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
   const { hash, salt } = await hashPassword(next);
   const value: OwnerAccount = { email, hash, salt, updatedAt: new Date().toISOString() };
   await db
@@ -632,6 +632,12 @@ async function clientLogin(request: Request, env: Env, rawEnv: unknown): Promise
   if (rateLimited(`client-login:${clientIp(request)}`, 10, 10 * 60 * 1000)) return json({ error: "Too many sign-in attempts. Try again in a few minutes." }, 429);
   const body = ((await request.json().catch(() => ({}))) ?? {}) as { email?: string; password?: string };
   const email = String(body.email ?? "").trim().toLowerCase();
+  // The owner may sign in with any email (set in her dashboard): the same form opens the dashboard.
+  const owner = await ownerAccount(rawEnv);
+  if (owner?.email === email && (await staffPasswordMatches(env, owner, String(body.password ?? "")))) {
+    const staffCookie = await createSession(env, email, request);
+    return json({ staff: true, email }, 200, staffCookie ? { "set-cookie": staffCookie } : {});
+  }
   const row = await db.prepare("SELECT data, password_hash, salt FROM customers WHERE email = ?").bind(email).first<{ data: string; password_hash: string; salt: string }>();
   // hash even when the account does not exist, so timing does not reveal which emails are registered
   const { hash } = await hashPassword(String(body.password ?? ""), row?.salt);

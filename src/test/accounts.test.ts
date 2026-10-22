@@ -143,17 +143,24 @@ describe("owner sign-in set from the dashboard (server, SQLite)", () => {
       handleApi(req("/api/staff/account", { method: "POST", headers, body: JSON.stringify(body) }), env);
     expect((await update({ currentPassword: "starter-pass", newPassword: "x", email: "hello@doggroomingtoronto.ca" }))!.status).toBe(400);
     expect((await update({ currentPassword: "wrong", newPassword: "her-own-pass-2026", email: "hello@doggroomingtoronto.ca" }))!.status).toBe(401);
-    expect((await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026", email: "me@gmail.com" }))!.status).toBe(400);
+    expect((await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026", email: "not-an-email" }))!.status).toBe(400);
     expect((await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026" }, {}))!.status).toBe(401);
-    const saved = await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026", email: "Angelica@DogGroomingToronto.ca" });
+    const saved = await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026", email: "Angelica.Owner@Gmail.com" });
     expect(saved!.status).toBe(200);
 
     expect(await config()).toMatchObject({ live: true, demoAccess: false });
     expect((await login("admin@thefreshpooch.ca", "starter-pass"))!.status).toBe(401);
-    const own = await login("angelica@doggroomingtoronto.ca", "her-own-pass-2026");
+    const own = await login("angelica.owner@gmail.com", "her-own-pass-2026");
     expect(own!.status).toBe(200);
     const session = await handleApi(req("/api/staff/session", { headers: { cookie: cookieOf(own!) } }), env);
-    expect(await session!.json()).toMatchObject({ authenticated: true, email: "angelica@doggroomingtoronto.ca" });
+    expect(await session!.json()).toMatchObject({ authenticated: true, email: "angelica.owner@gmail.com" });
+    // the pet-parent sign-in form recognises her email and opens the dashboard
+    const viaPortal = await handleApi(req("/api/account/login", { method: "POST", body: JSON.stringify({ email: "angelica.owner@gmail.com", password: "her-own-pass-2026" }) }), env);
+    expect(await viaPortal!.json()).toMatchObject({ staff: true });
+    const portalSession = await handleApi(req("/api/staff/session", { headers: { cookie: cookieOf(viaPortal!) } }), env);
+    expect(await portalSession!.json()).toMatchObject({ authenticated: true });
+    const wrong = await handleApi(req("/api/account/login", { method: "POST", body: JSON.stringify({ email: "angelica.owner@gmail.com", password: "nope-nope-nope" }) }), env);
+    expect(wrong!.status).toBe(401);
     expect((await handleApi(req("/api/staff/demo-login", { method: "POST" }), env))!.status).toBe(403);
   });
 });

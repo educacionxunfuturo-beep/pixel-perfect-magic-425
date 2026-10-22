@@ -78,11 +78,7 @@ export function AdminSurface({
   // The password is checked by the server; a pet-parent email is sent to the Customer Portal instead.
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!looksLikeStaffEmail(email)) {
-      if (email.includes("@") && onClientLogin) onClientLogin();
-      else setError("This sign-in is for The Fresh Pooch staff. Pet parents sign in through the Customer Portal.");
-      return;
-    }
+    // the owner may use any email, so every address is checked by the staff sign-in first
     setBusy(true);
     try {
       await staffLogin(email, password);
@@ -90,6 +86,10 @@ export function AdminSurface({
       onAuthChange?.(true);
       setError("");
     } catch (err) {
+      if (!looksLikeStaffEmail(email) && email.includes("@") && onClientLogin) {
+        setError("Wrong email or password. Pet parents sign in through the Customer Portal.");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Sign-in failed.");
     } finally {
       setBusy(false);

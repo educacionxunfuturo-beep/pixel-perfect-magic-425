@@ -46,6 +46,20 @@ export function clientLogin(email: string, password: string) {
   return call("/api/account/login", { email, password });
 }
 
+/** Portal sign-in: a pet parent's account, or `{ staff: true }` when the email is the owner's. */
+export async function portalLogin(email: string, password: string): Promise<ClientAccount | { staff: true }> {
+  const res = await fetch("/api/account/login", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Partial<ClientAccount> & { error?: string; staff?: boolean };
+  if (res.ok && data.staff) return { staff: true };
+  if (!res.ok || !data.profile) throw new Error(data.error ?? "Something went wrong. Please try again.");
+  return { profile: data.profile, bookings: data.bookings ?? [] };
+}
+
 /** The signed-in account, or null. */
 export async function getClientAccount(): Promise<ClientAccount | null> {
   try {
