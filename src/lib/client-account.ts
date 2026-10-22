@@ -12,6 +12,7 @@ export interface ClientProfile {
   address: string;
   pet: { name: string; breed: string; weightLbs: number };
   createdAt: string;
+  privacyConsentAt?: string;
   access?: { code: string; notes: string };
   vaccines?: Partial<Record<VaccineKind, { expires: string; docId?: string; fileName?: string; uploadedAt: string }>>;
 }
@@ -38,7 +39,7 @@ async function call(path: string, body?: unknown): Promise<ClientAccount> {
   return { profile: data.profile, bookings: data.bookings ?? [] };
 }
 
-export function clientSignup(input: { name: string; email: string; password: string; phone: string; address: string; petName: string; petBreed: string; petWeightLbs: number }) {
+export function clientSignup(input: { name: string; email: string; password: string; phone: string; address: string; petName: string; petBreed: string; petWeightLbs: number; consent: boolean }) {
   return call("/api/account/signup", input);
 }
 
@@ -104,4 +105,27 @@ export async function requestPasswordReset(email: string): Promise<"email" | "ow
 
 export function resetPassword(token: string, password: string) {
   return call("/api/account/reset", { token, password });
+}
+
+/** Deletes the account for good (profile, certificates; bookings keep only anonymous totals). */
+export async function deleteAccount(password: string): Promise<void> {
+  const res = await fetch("/api/account/delete", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(data.error ?? "Could not delete the account. Please try again.");
+}
+
+/** Saves everything the account holds as a JSON file (PIPEDA right of access). */
+export function downloadMyData(account: ClientAccount) {
+  const file = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), ...account }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `the-fresh-pooch-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

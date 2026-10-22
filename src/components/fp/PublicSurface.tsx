@@ -308,6 +308,12 @@ function QuoteWizard({ preset }: { preset: { id: PackageId; n: number } | null }
           </button>
         )}
       </div>
+      {step === 5 && !booked && (
+        <p className="border-t border-border bg-muted/40 px-6 pb-4 text-[11px] text-muted-foreground">
+          By sending a request you agree that we use your details to arrange the appointment, as described in our{" "}
+          <a href="/privacy" className="font-semibold text-teal underline">Privacy Policy</a>.
+        </p>
+      )}
     </div>
   );
 }

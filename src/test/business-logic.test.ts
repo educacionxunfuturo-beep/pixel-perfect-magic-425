@@ -231,7 +231,10 @@ describe("shared bookings (server, D1)", () => {
   it("creates pet-parent accounts with hashed passwords and links their bookings", async () => {
     const db = fakeD1();
     const env = { STAFF_PASSWORD: "s3cret", BOOKINGS_DB: db };
-    const signupBody = { name: "Alex P.", email: "alex@example.com", password: "woofwoof1", phone: "416-555-0101", address: "1 Main St", petName: "Milo", petBreed: "Goldendoodle", petWeightLbs: 30 };
+    const signupBody = { name: "Alex P.", email: "alex@example.com", password: "woofwoof1", phone: "416-555-0101", address: "1 Main St", petName: "Milo", petBreed: "Goldendoodle", petWeightLbs: 30, consent: true };
+    const { consent: _consent, ...withoutConsent } = signupBody;
+    const noConsent = await handleApi(req("/api/account/signup", { method: "POST", body: JSON.stringify(withoutConsent) }), env);
+    expect(noConsent!.status).toBe(400);
     const signedUp = await handleApi(req("/api/account/signup", { method: "POST", body: JSON.stringify(signupBody) }), env);
     expect(signedUp!.status).toBe(200);
     expect(db.customers.get("alex@example.com")!.password_hash).not.toContain("woofwoof1");

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { PRIVACY_ACCEPTED_EVENT, privacyNoticeAccepted } from "./CookieNotice";
 import { X, Gift, Copy, Check, MessageCircle, UserPlus, Heart } from "lucide-react";
 import { Pill } from "./primitives";
 
@@ -15,12 +16,18 @@ export function PromoModal({ onOpenPortal }: { onOpenPortal?: () => void }) {
     const dismissed = localStorage.getItem("fp_promo_dismissed");
     if (dismissed === "true") return;
 
-    // Trigger after 60 seconds (1 minute) of active browsing
-    const timer = setTimeout(() => {
-      setIsOpen(true);
-    }, 60000);
+    // Trigger after 60 seconds (1 minute) of active browsing, never on top of the privacy notice
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      timer = setTimeout(() => setIsOpen(true), 60000);
+    };
+    if (privacyNoticeAccepted()) start();
+    else window.addEventListener(PRIVACY_ACCEPTED_EVENT, start, { once: true });
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener(PRIVACY_ACCEPTED_EVENT, start);
+    };
   }, []);
 
   const handleDismiss = () => {

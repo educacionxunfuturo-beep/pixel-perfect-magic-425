@@ -40,7 +40,7 @@ const cookieOf = (res: Response) => res.headers.get("set-cookie")!.split(";")[0]
 
 async function signedUpParent(env: Record<string, unknown>, email = "sam@example.com") {
   const res = await handleApi(
-    req("/api/account/signup", { method: "POST", body: JSON.stringify({ name: "Sam Lee", email, password: "woofwoof1", phone: "416-555-0199", address: "1 Main St", petName: "Milo", petBreed: "Maltese", petWeightLbs: 12 }) }),
+    req("/api/account/signup", { method: "POST", body: JSON.stringify({ name: "Sam Lee", email, password: "woofwoof1", phone: "416-555-0199", address: "1 Main St", petName: "Milo", petBreed: "Maltese", petWeightLbs: 12, consent: true }) }),
     env,
   );
   expect(res!.status).toBe(200);
@@ -162,5 +162,41 @@ describe("owner sign-in set from the dashboard (server, SQLite)", () => {
     const wrong = await handleApi(req("/api/account/login", { method: "POST", body: JSON.stringify({ email: "angelica.owner@gmail.com", password: "nope-nope-nope" }) }), env);
     expect(wrong!.status).toBe(401);
     expect((await handleApi(req("/api/staff/demo-login", { method: "POST" }), env))!.status).toBe(403);
+  });
+});
+
+describe("account deletion (server, SQLite)", () => {
+  it("erases the profile and certificates, cancels upcoming bookings and keeps only anonymous totals", async () => {
+    const d1 = sqliteD1();
+    const env = { STAFF_PASSWORD: "s3cret", BOOKINGS_DB: d1 };
+    const cookie = await signedUpParent(env);
+    const pdf = Buffer.from("%PDF-1.4 test").toString("base64");
+    await handleApi(req("/api/account/vaccines", { method: "POST", headers: { cookie }, body: JSON.stringify({ kind: "rabies", expires: "2027-05-01", fileName: "rabies.pdf", contentType: "application/pdf", data: pdf }) }), env);
+    const future = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10);
+    const past = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+    const book = (id: string, date: string) =>
+      handleApi(req("/api/bookings", { method: "POST", headers: { cookie }, body: JSON.stringify({ id, date, service: "full", source: "portal", petName: "Milo", breed: "Maltese", weightLbs: 12, total: 140, ownerName: "Sam Lee", ownerPhone: "416-555-0199", address: "1 Main St", timeWindow: "Morning" }) }), env);
+    await book("appt-del-next", future);
+    await book("appt-del-old", past);
+
+    expect((await handleApi(req("/api/account/delete", { method: "POST", body: JSON.stringify({ password: "woofwoof1" }) }), env))!.status).toBe(401);
+    expect((await handleApi(req("/api/account/delete", { method: "POST", headers: { cookie }, body: JSON.stringify({ password: "wrong-pass" }) }), env))!.status).toBe(401);
+    const res = await handleApi(req("/api/account/delete", { method: "POST", headers: { cookie }, body: JSON.stringify({ password: "woofwoof1" }) }), env);
+    expect(res!.status).toBe(200);
+    expect(await res!.json()).toMatchObject({ deleted: true, cancelled: 1 });
+
+    const count = (sql: string) => (d1.db.prepare(sql).get() as { n: number }).n;
+    expect(count("SELECT COUNT(*) AS n FROM customers WHERE email = 'sam@example.com'")).toBe(0);
+    expect(count("SELECT COUNT(*) AS n FROM vaccine_docs WHERE email = 'sam@example.com'")).toBe(0);
+    expect(count("SELECT COUNT(*) AS n FROM bookings WHERE customer_email IS NOT NULL")).toBe(0);
+    const rows = d1.db.prepare("SELECT id, data FROM bookings ORDER BY id").all() as { id: string; data: string }[];
+    const byId = Object.fromEntries(rows.map((r) => [r.id, JSON.parse(r.data) as Record<string, unknown>]));
+    expect(byId["appt-del-next"]!["status"]).toBe("cancelled");
+    for (const b of Object.values(byId)) {
+      expect(JSON.stringify(b)).not.toMatch(/Sam Lee|416-555-0199|1 Main St|Milo/);
+      expect(b["total"]).toBe(140);
+    }
+    // the session is gone and the account can no longer sign in
+    expect((await handleApi(req("/api/account/login", { method: "POST", body: JSON.stringify({ email: "sam@example.com", password: "woofwoof1" }) }), env))!.status).toBe(401);
   });
 });

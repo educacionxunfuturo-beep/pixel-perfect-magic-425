@@ -436,7 +436,7 @@ async function notifyOwner(request: Request, env: Env, booking: BookingRecord, d
 // Messages carry the dog, service, date and price only: never addresses, phones or access codes.
 
 interface StaffAlert {
-  kind: "booking" | "password" | "test";
+  kind: "booking" | "password" | "account" | "test";
   title: string;
   body: string;
 }
@@ -576,6 +576,8 @@ interface CustomerProfile {
   address: string;
   pet: { name: string; breed: string; weightLbs: number };
   createdAt: string;
+  /** When the pet parent accepted the Privacy Policy (sign-up). */
+  privacyConsentAt?: string;
   /** Lockbox / door code and access notes, copied onto each booking for the groomer. */
   access?: { code: string; notes: string };
   /** Expiry date (YYYY-MM-DD) and certificate of each core vaccine. */
@@ -607,6 +609,7 @@ async function signup(request: Request, env: Env, rawEnv: unknown): Promise<Resp
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Please enter a valid email address." }, 400);
   if (password.length < 8 || password.length > 200) return json({ error: "Use a password of at least 8 characters." }, 400);
   if (!name || !petName) return json({ error: "Please add your name and your dog's name." }, 400);
+  if (body["consent"] !== true) return json({ error: "Please accept the Privacy Policy to create an account." }, 400);
   if (staffEmails(env).includes(email)) return json({ error: "This email belongs to the staff. Sign in with it instead." }, 400);
   const profile: CustomerProfile = {
     name,
@@ -615,6 +618,7 @@ async function signup(request: Request, env: Env, rawEnv: unknown): Promise<Resp
     address: String(body["address"] ?? "").trim().slice(0, 160),
     pet: { name: petName, breed: String(body["petBreed"] ?? "").trim().slice(0, 60) || "Mixed breed", weightLbs: Number.isFinite(weight) ? Math.min(Math.max(Math.round(weight), 2), 250) : 30 },
     createdAt: new Date().toISOString(),
+    privacyConsentAt: new Date().toISOString(),
   };
   const { hash, salt } = await hashPassword(password);
   const result = (await db
@@ -644,6 +648,52 @@ async function clientLogin(request: Request, env: Env, rawEnv: unknown): Promise
   if (!row || !sameBytes(enc.encode(hash), enc.encode(row.password_hash))) return json({ error: "Wrong email or password." }, 401);
   const cookie = await signedCookie(env, "client", CLIENT_COOKIE, email, CLIENT_SECONDS, request);
   return accountResponse(db, JSON.parse(row.data) as CustomerProfile, cookie ? { "set-cookie": cookie } : {});
+}
+
+// Booking fields kept after an account is deleted: what tax records need, nothing that identifies the person.
+const KEPT_AFTER_DELETION = ["id", "date", "service", "source", "status", "total", "weightLbs", "breed", "reference", "timeWindow", "time", "createdAt", "completedAt", "paymentMethod"] as const;
+
+/**
+ * Deletes a pet-parent account (PIPEDA withdrawal of consent; required by both app stores):
+ * the profile, vaccine certificates and reset links go; bookings keep only anonymous totals,
+ * and upcoming ones are cancelled.
+ */
+async function deleteAccount(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Accounts are not available on this server." }, 503);
+  const profile = await signedInCustomer(request, env, db);
+  if (!profile) return json({ error: "Please sign in again first." }, 401);
+  if (rateLimited(`delete:${clientIp(request)}`, 5, 60 * 60 * 1000)) return json({ error: "Too many attempts. Try again later." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as { password?: string };
+  const row = await db.prepare("SELECT password_hash, salt FROM customers WHERE email = ?").bind(profile.email).first<{ password_hash: string; salt: string }>();
+  const { hash } = await hashPassword(String(body.password ?? ""), row?.salt);
+  if (!row || !sameBytes(enc.encode(hash), enc.encode(row.password_hash))) return json({ error: "The password is not correct." }, 401);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date().toISOString();
+  const { results } = await db.prepare("SELECT id, data FROM bookings WHERE customer_email = ?").bind(profile.email).all<{ id: string; data: string }>();
+  let cancelled = 0;
+  for (const r of results) {
+    const booking = JSON.parse(r.data) as Record<string, unknown>;
+    const kept: Record<string, unknown> = Object.fromEntries(KEPT_AFTER_DELETION.filter((k) => booking[k] !== undefined).map((k) => [k, booking[k]]));
+    const status = String(booking["status"] ?? "");
+    if (String(booking["date"] ?? "") >= today && status !== "completed" && status !== "cancelled") {
+      kept["status"] = "cancelled";
+      cancelled++;
+    }
+    kept["petName"] = "Deleted account";
+    await db.prepare("UPDATE bookings SET data = ?, customer_email = NULL, updated_at = ? WHERE id = ?").bind(JSON.stringify(kept), now, r.id).run();
+  }
+  await db.prepare("DELETE FROM vaccine_docs WHERE email = ?").bind(profile.email).run();
+  await db.prepare("DELETE FROM password_resets WHERE email = ?").bind(profile.email).run();
+  await db.prepare("DELETE FROM reset_requests WHERE email = ?").bind(profile.email).run();
+  await db.prepare("DELETE FROM customers WHERE email = ?").bind(profile.email).run();
+  await notifyStaff(request, env, db, {
+    kind: "account",
+    title: "A pet parent deleted their account",
+    body: cancelled ? `${cancelled} upcoming booking${cancelled === 1 ? " was" : "s were"} cancelled.` : "No upcoming bookings were affected.",
+  }).catch(() => undefined);
+  return json({ deleted: true, cancelled }, 200, { "set-cookie": `${CLIENT_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
 }
 
 /** The signed-in pet parent's email and stored profile, or null. */
@@ -858,6 +908,7 @@ export async function handleApi(request: Request, rawEnv: unknown): Promise<Resp
   if (pathname === "/api/account/signup" && method === "POST") return signup(request, env, rawEnv);
   if (pathname === "/api/account/login" && method === "POST") return clientLogin(request, env, rawEnv);
   if (pathname === "/api/account" && method === "GET") return currentAccount(request, env, rawEnv);
+  if (pathname === "/api/account/delete" && method === "POST") return deleteAccount(request, env, rawEnv);
   if (pathname === "/api/account/logout" && method === "POST") return json({ ok: true }, 200, { "set-cookie": `${CLIENT_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
   if (pathname === "/api/account/access" && method === "POST") return updateAccess(request, env, rawEnv);
   if (pathname === "/api/account/vaccines" && method === "POST") return saveVaccine(request, env, rawEnv);

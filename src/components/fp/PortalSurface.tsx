@@ -9,6 +9,7 @@ import barnaby from "@/assets/barnaby.jpg";
 import vanPhoto from "@/assets/gallery/gallery-van-exterior.jpg";
 import { DEMO_CLIENT_EMAIL, clientLogout, portalLogin, clientSignup, getClientAccount, requestPasswordReset, resetPassword, saveAccess, type ClientAccount, type ClientProfile } from "@/lib/client-account";
 import { AccountVaccines } from "./AccountVaccines";
+import { AccountPrivacy } from "./AccountPrivacy";
 import { cn } from "@/lib/utils";
 import { Chip, Pill, SectionTitle } from "./primitives";
 import { dispatchNotification } from "@/lib/notifications";
@@ -120,6 +121,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [authMode, setAuthMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [signupConsent, setSignupConsent] = useState(false);
   const [userEmail, setUserEmail] = useState("jordan.m@torontoparents.ca");
   const [userName, setUserName] = useState("Jordan Miller");
   const [userPhone, setUserPhone] = useState("(416) 555-0199");
@@ -305,6 +307,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                             petName: signupPetName,
                             petBreed: signupPetBreed,
                             petWeightLbs: Number(signupPetWeight),
+                            consent: signupConsent,
                           })
                         : await portalLogin(userEmail, loginPassword);
                     if ("staff" in acc) {
@@ -401,6 +404,14 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   </div>
                 )}
 
+                {authMode === "signup" && (
+                  <label className="flex items-start gap-2.5 rounded-xl border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
+                    <input type="checkbox" required checked={signupConsent} onChange={(e) => setSignupConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--teal)]" />
+                    <span>
+                      I agree to the <a href="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-teal underline">Privacy Policy</a> and allow The Fresh Pooch to keep my contact details, my dog's records, access code and vaccine certificates to provide the grooming service. I can download or delete my data at any time.
+                    </span>
+                  </label>
+                )}
                 {loginError && <p className="text-xs font-semibold text-destructive">{loginError}</p>}
                 {authNotice && <p className="rounded-xl bg-success-soft px-3 py-2 text-xs font-semibold text-success">{authNotice}</p>}
                 {authMode === "login" && (
@@ -1552,6 +1563,24 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
             </div>
           </div>
         </div>
+      )}
+
+      {account && (
+        <AccountPrivacy
+          account={account}
+          onDeleted={() => {
+            setAccount(null);
+            setPet(DEFAULT_PET);
+            setLoginPassword("");
+            setSignupConsent(false);
+            setAuthMode("login");
+            setLoginError(null);
+            setAuthNotice("Your account and personal data were deleted. Thank you for trusting The Fresh Pooch.");
+            setActiveTab("overview");
+            setBookingConfirmed(false);
+            setIsAuthenticated(false);
+          }}
+        />
       )}
     </div>
   );

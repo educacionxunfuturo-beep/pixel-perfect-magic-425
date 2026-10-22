@@ -19,7 +19,7 @@ export const PACKAGES: { id: PackageId; name: string; price: string; from: numbe
 
 export function Packages({ onSelect }: { onSelect: (id: PackageId) => void }) {
   return (
-    <section className="border-t border-border">
+    <section id="packages" className="scroll-mt-24 border-t border-border">
       <div className="mx-auto max-w-7xl px-4 py-14 md:px-6">
         <SectionTitle eyebrow="Signature Spa Packages" title="Choose your pup's pampering" sub="Transparent Toronto pricing in CAD. Every groom is 1-on-1 and cage-free." />
         <div className="grid gap-5 md:grid-cols-3">
@@ -118,7 +118,7 @@ const FAQS = [
 export function Faq() {
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section className="border-t border-border">
+    <section id="faq" className="scroll-mt-24 border-t border-border">
       <div className="mx-auto max-w-3xl px-4 py-14 md:px-6">
         <SectionTitle eyebrow="Toronto FAQ" title="Questions from pet parents" />
         <div className="space-y-3">
@@ -169,19 +169,25 @@ export function SiteFooter() {
             <h4 className="font-serif text-lg font-semibold text-white">Quick links</h4>
             <ul className="mt-4 space-y-2.5 text-white/65 text-sm">
               <li>
-                <a href="#quote" className="hover:text-aqua transition-colors">Contact Us / Book Now</a>
+                <a href="/#quote" className="hover:text-aqua transition-colors">Contact Us / Book Now</a>
               </li>
               <li>
-                <a href="#packages" className="hover:text-aqua transition-colors">Who We Are</a>
+                <a href="/#packages" className="hover:text-aqua transition-colors">Who We Are</a>
               </li>
               <li>
-                <a href="#faq" className="hover:text-aqua transition-colors">Cancellation Policy</a>
+                <a href="/#faq" className="hover:text-aqua transition-colors">Cancellation Policy</a>
               </li>
               <li>
-                <a href="#faq" className="hover:text-aqua transition-colors">Privacy Policy</a>
+                <a href="/privacy" className="hover:text-aqua transition-colors">Privacy Policy</a>
               </li>
               <li>
-                <a href="#subscriptions" className="hover:text-aqua transition-colors">VIP Club & Sitemap</a>
+                <a href="/privacy#cookies" className="hover:text-aqua transition-colors">Cookies</a>
+              </li>
+              <li>
+                <a href="/privacy#delete-account" className="hover:text-aqua transition-colors">Delete my account</a>
+              </li>
+              <li>
+                <a href="/#subscriptions" className="hover:text-aqua transition-colors">VIP Club & Sitemap</a>
               </li>
             </ul>
           </div>
@@ -250,6 +256,10 @@ export function SiteFooter() {
                 {subscribedDone ? "✓ Subscribed!" : "SUBSCRIBE"}
               </button>
             </form>
+            <p className="mt-2 text-[11px] text-white/50">
+              By subscribing you agree to receive emails from The Fresh Pooch. Unsubscribe at any time. See our{" "}
+              <a href="/privacy#emails" className="underline hover:text-aqua">Privacy Policy</a>.
+            </p>
             {subscribedDone && (
               <p className="mt-2 text-xs font-semibold text-aqua">
                 🎉 Welcome to the pack! Check your inbox for a special welcome treat.

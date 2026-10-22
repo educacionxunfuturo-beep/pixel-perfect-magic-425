@@ -9,6 +9,7 @@ import { SiteFooter } from "@/components/fp/PublicSections";
 import { QimmiqAssistant } from "@/components/fp/QimmiqAssistant";
 import { AdminSurface } from "@/components/fp/AdminSurface";
 import { PromoModal } from "@/components/fp/PromoModal";
+import { CookieNotice } from "@/components/fp/CookieNotice";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,7 +49,8 @@ function Index() {
       }
     });
     // password-reset links (/?reset=...) open the pet-parent portal
-    if (params.has("reset")) setSurface("portal");
+    // password-reset links (/?reset=...) and the privacy page's "delete your account" link (/?account) open the portal
+    if (params.has("reset") || params.has("account")) setSurface("portal");
   }, []);
 
   const handleNavChange = (s: Surface) => {
@@ -88,6 +90,7 @@ function Index() {
       <SiteFooter />
       <QimmiqAssistant isAdmin={surface === "admin" && isAdminAuthenticated} />
       <PromoModal onOpenPortal={() => handleNavChange("portal")} />
+      <CookieNotice />
     </div>
   );
 }
