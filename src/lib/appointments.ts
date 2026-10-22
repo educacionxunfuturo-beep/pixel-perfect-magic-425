@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { DEMO_ROUTE_STOPS } from "./demo-route";
+import { hasStaffHint, setStaffHint } from "./staff-session";
 import { QUOTE_BREEDS, SERVICES, quote, tierForWeight, type ServiceId } from "./pricing";
 
 /**
@@ -441,9 +442,14 @@ async function shareBooking(appt: Appointment) {
 }
 
 async function fetchSharedBookings(): Promise<Appointment[]> {
+  if (!hasStaffHint()) {
+    sharedAccess = false;
+    return [];
+  }
   try {
     const res = await fetch("/api/bookings", { credentials: "same-origin" });
     sharedAccess = res.ok;
+    if (res.status === 401) setStaffHint(false);
     if (!res.ok) return [];
     const data = (await res.json()) as { bookings?: Appointment[] };
     return data.bookings ?? [];

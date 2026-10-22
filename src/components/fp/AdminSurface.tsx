@@ -287,7 +287,7 @@ export function AdminSurface({
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="eyebrow text-gold">Owner Dashboard</div>
+          <div className="eyebrow text-gold-deep">Owner Dashboard</div>
           <h1 className="text-4xl font-semibold">Operations at a glance</h1>
         </div>
         <div className="flex gap-1 rounded-full border border-border bg-card p-1">

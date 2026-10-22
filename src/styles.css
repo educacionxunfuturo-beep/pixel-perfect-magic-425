@@ -33,9 +33,13 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-teal: var(--teal);
+  --color-teal-deep: var(--teal-deep);
+  --color-aqua: var(--aqua);
+  --color-aqua-soft: var(--aqua-soft);
   --color-sage: var(--sage);
   --color-sage-soft: var(--sage-soft);
   --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
   --color-amber: var(--amber);
   --color-gold-soft: var(--gold-soft);
   --color-ink: var(--ink);
@@ -59,57 +63,64 @@
 }
 
 :root {
+  /* Brand palette taken from the official logo: turquoise ring #03BBC7, comb gold #F0A60E,
+     bandana yellow, black lettering. Deep turquoise carries text and buttons (AA on white). */
   --radius: 0.875rem;
-  --background: oklch(0.983 0.005 75);
-  --foreground: oklch(0.28 0.04 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.28 0.04 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.28 0.04 260);
-  --primary: oklch(0.4 0.04 195);
-  --primary-foreground: oklch(0.983 0.005 75);
-  --secondary: oklch(0.955 0.012 80);
-  --secondary-foreground: oklch(0.4 0.04 195);
-  --muted: oklch(0.955 0.01 80);
-  --muted-foreground: oklch(0.52 0.02 250);
-  --accent: oklch(0.94 0.035 75);
-  --accent-foreground: oklch(0.38 0.06 60);
+  --background: #f7fbfb;
+  --foreground: #15232b;
+  --card: #ffffff;
+  --card-foreground: #15232b;
+  --popover: #ffffff;
+  --popover-foreground: #15232b;
+  --primary: #00727d;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf6f7;
+  --secondary-foreground: #00727d;
+  --muted: #eff5f6;
+  --muted-foreground: #52646b;
+  --accent: #fff3d6;
+  --accent-foreground: #7a5200;
   --destructive: oklch(0.577 0.2 27);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.9 0.012 75);
-  --input: oklch(0.9 0.012 75);
-  --ring: oklch(0.45 0.035 200);
+  --border: #d9e9eb;
+  --input: #d9e9eb;
+  --ring: #03bbc7;
 
-  --teal: oklch(0.4 0.04 195);
-  --sage: oklch(0.45 0.035 200);
-  --sage-soft: oklch(0.94 0.015 195);
-  --gold: oklch(0.75 0.085 65);
-  --amber: oklch(0.75 0.14 70);
-  --gold-soft: oklch(0.95 0.04 75);
-  --ink: oklch(0.28 0.04 260);
-  --ink-foreground: oklch(0.983 0.005 75);
+  --aqua: #03bbc7;
+  --aqua-soft: #e3f7f9;
+  --teal: #00727d;
+  --teal-deep: #004f57;
+  --sage: #0397a3;
+  --sage-soft: #e6f6f8;
+  --gold: #f0a60e;
+  --gold-deep: #9a6400;
+  --amber: #ffc21a;
+  --gold-soft: #fff4d6;
+  --ink: #15232b;
+  --ink-foreground: #ffffff;
   --success: oklch(0.55 0.11 155);
   --success-soft: oklch(0.95 0.04 155);
-  --warning-soft: oklch(0.95 0.05 80);
+  --warning-soft: #fff1cc;
 
-  --gradient-teal: linear-gradient(135deg, oklch(0.36 0.04 195), oklch(0.47 0.04 200));
-  --gradient-gold: linear-gradient(135deg, var(--gold), var(--amber));
-  --shadow-soft: 0 1px 2px oklch(0.4 0.03 60 / 0.06), 0 8px 24px -12px oklch(0.4 0.03 60 / 0.18);
-  --shadow-lift: 0 2px 4px oklch(0.4 0.03 60 / 0.06), 0 24px 48px -20px oklch(0.3 0.04 195 / 0.35);
+  --gradient-teal: linear-gradient(135deg, #004f57 0%, #00727d 55%, #03a7b4 100%);
+  --gradient-gold: linear-gradient(135deg, #ffd23f, #f0a60e);
+  --gradient-brand-dark: radial-gradient(120% 140% at 50% 0%, #0b4a53 0%, #15232b 62%);
+  --shadow-soft: 0 1px 2px rgb(0 79 87 / 0.06), 0 8px 24px -12px rgb(0 79 87 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(0 79 87 / 0.06), 0 24px 48px -20px rgb(0 114 125 / 0.38);
 
   --chart-1: var(--teal);
   --chart-2: var(--gold);
-  --chart-3: var(--amber);
+  --chart-3: var(--aqua);
   --chart-4: var(--sage);
   --chart-5: var(--ink);
-  --sidebar: oklch(0.983 0.005 75);
-  --sidebar-foreground: oklch(0.28 0.04 260);
-  --sidebar-primary: oklch(0.4 0.04 195);
-  --sidebar-primary-foreground: oklch(0.983 0.005 75);
-  --sidebar-accent: oklch(0.955 0.012 80);
-  --sidebar-accent-foreground: oklch(0.4 0.04 195);
-  --sidebar-border: oklch(0.9 0.012 75);
-  --sidebar-ring: oklch(0.45 0.035 200);
+  --sidebar: #f7fbfb;
+  --sidebar-foreground: #15232b;
+  --sidebar-primary: #00727d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf6f7;
+  --sidebar-accent-foreground: #00727d;
+  --sidebar-border: #d9e9eb;
+  --sidebar-ring: #03bbc7;
 }
 
 @layer base {
@@ -150,6 +161,9 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
+@utility bg-brand-dark {
+  background: var(--gradient-brand-dark);
+}
 @utility trailer-rivets {
   background-image: radial-gradient(circle, oklch(1 0 0 / 0.18) 1px, transparent 1.5px);
   background-size: 14px 14px;
@@ -161,4 +175,16 @@
 }
 @utility animate-fade-up {
   animation: fade-up 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Soap bubbles from the logo: slow drift, still for people who prefer less motion. */
+@keyframes bubble-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@utility animate-bubble {
+  animation: bubble-drift 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-bubble { animation: none; }
 }

@@ -1,14 +1,58 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import logoImg from "@/assets/official-logo.png";
+import logoImg from "@/assets/fresh-pooch-logo.webp";
 
 export function BrandLogo({ className }: { className?: string }) {
   return (
     <img
       src={logoImg}
       alt="The Fresh Pooch official logo"
-      className={cn("h-10 w-10 object-contain rounded-full bg-white p-0.5 shadow-sm border border-border/40", className)}
+      width={512}
+      height={512}
+      className={cn("h-10 w-10 rounded-full bg-white object-contain shadow-sm ring-1 ring-aqua/25", className)}
     />
+  );
+}
+
+/** The official logo shown as a seal: white disc, brand-turquoise halo and a soft lift shadow. */
+export function BrandSeal({ className, decorative = false }: { className?: string; decorative?: boolean }) {
+  return (
+    <div className={cn("relative aspect-square rounded-full bg-white p-[3%] shadow-lift ring-1 ring-aqua/20", className)}>
+      <div className="absolute -inset-[6%] -z-10 rounded-full bg-aqua/15 blur-xl" aria-hidden />
+      <img
+        src={logoImg}
+        alt={decorative ? "" : "The Fresh Pooch, mobile dog wash & grooming"}
+        width={512}
+        height={512}
+        loading="lazy"
+        className="h-full w-full rounded-full object-contain"
+      />
+    </div>
+  );
+}
+
+const BUBBLES = [
+  { x: "1%", y: "34%", s: 40, d: "0s" },
+  { x: "12%", y: "70%", s: 22, d: "1.4s" },
+  { x: "36%", y: "4%", s: 16, d: "2.2s" },
+  { x: "49%", y: "86%", s: 30, d: "0.6s" },
+  { x: "58%", y: "12%", s: 58, d: "3s" },
+  { x: "88%", y: "62%", s: 34, d: "1.9s" },
+  { x: "95%", y: "20%", s: 18, d: "0.9s" },
+];
+
+/** Soap bubbles from the logo, as a quiet background texture. */
+export function Bubbles({ className }: { className?: string }) {
+  return (
+    <div className={cn("pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden md:block", className)} aria-hidden>
+      {BUBBLES.map((b, i) => (
+        <span
+          key={i}
+          className="animate-bubble absolute rounded-full border border-aqua/30 bg-[radial-gradient(circle_at_30%_28%,rgb(255_255_255/0.95)_0_12%,rgb(3_187_199/0.10)_36%,rgb(3_187_199/0.04)_70%)]"
+          style={{ left: b.x, top: b.y, width: b.s, height: b.s, animationDelay: b.d }}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -76,24 +120,14 @@ export function Pill({
 export function SectionTitle({ eyebrow, title, sub }: { eyebrow?: string; title: string; sub?: string }) {
   return (
     <div className="mb-6">
-      {eyebrow && <div className="eyebrow mb-2 text-gold">{eyebrow}</div>}
+      {eyebrow && (
+        <div className="eyebrow mb-2 flex items-center gap-2.5 text-gold-deep">
+          <span className="h-[2px] w-7 rounded-full bg-gradient-gold" aria-hidden />
+          {eyebrow}
+        </div>
+      )}
       <h2 className="text-3xl font-semibold text-foreground md:text-4xl">{title}</h2>
       {sub && <p className="mt-2 max-w-2xl text-muted-foreground">{sub}</p>}
     </div>
   );
 }
-
-export function PawLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 40 40" className={className} aria-hidden>
-      <rect x="1" y="1" width="38" height="38" rx="12" fill="var(--teal)" />
-      <g fill="var(--gold)">
-        <ellipse cx="13" cy="15" rx="3" ry="4" />
-        <ellipse cx="20" cy="11.5" rx="3" ry="4" />
-        <ellipse cx="27" cy="15" rx="3" ry="4" />
-        <path d="M20 19c-5 0-9 5-9 9 0 3 3 4 5 3s3-1.5 4-1.5 2 .5 4 1.5 5 0 5-3c0-4-4-9-9-9z" />
-      </g>
-    </svg>
-  );
-}
-

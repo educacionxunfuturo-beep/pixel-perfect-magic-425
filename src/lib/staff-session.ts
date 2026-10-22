@@ -32,6 +32,27 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
   return data.error ?? fallback;
 }
 
+// The session cookie is HttpOnly, so this flag tells the page whether asking for the shared
+// bookings is worth it. Visitors never send that request (it would only answer 401).
+const STAFF_HINT_KEY = "fp-staff-hint";
+
+export function hasStaffHint(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(STAFF_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setStaffHint(on: boolean) {
+  try {
+    if (on) window.localStorage.setItem(STAFF_HINT_KEY, "1");
+    else window.localStorage.removeItem(STAFF_HINT_KEY);
+  } catch {
+    // storage blocked: bookings then load after the session check
+  }
+}
+
 /** Staff can read the shared bookings: every part of the app showing bookings reloads them. */
 function refreshBookings() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event("fp-appointments-changed"));
@@ -40,17 +61,20 @@ function refreshBookings() {
 export async function staffLogin(email: string, password: string): Promise<void> {
   const res = await post("/api/staff/login", { email, password });
   if (!res.ok) throw new Error(await errorMessage(res, "Sign-in failed."));
+  setStaffHint(true);
   refreshBookings();
 }
 
 export async function staffDemoLogin(): Promise<void> {
   const res = await post("/api/staff/demo-login");
   if (!res.ok) throw new Error(await errorMessage(res, "Demo access is not available."));
+  setStaffHint(true);
   refreshBookings();
 }
 
 export async function staffLogout(): Promise<void> {
   await post("/api/staff/logout").catch(() => undefined);
+  setStaffHint(false);
   refreshBookings();
 }
 
@@ -58,7 +82,11 @@ export async function getStaffSession(): Promise<{ authenticated: boolean; email
   try {
     const res = await fetch("/api/staff/session", { credentials: "same-origin" });
     if (!res.ok) return { authenticated: false };
-    return (await res.json()) as { authenticated: boolean; email?: string };
+    const session = (await res.json()) as { authenticated: boolean; email?: string };
+    const had = hasStaffHint();
+    setStaffHint(session.authenticated);
+    if (session.authenticated && !had) refreshBookings();
+    return session;
   } catch {
     return { authenticated: false };
   }

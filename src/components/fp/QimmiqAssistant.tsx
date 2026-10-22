@@ -855,6 +855,13 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
     return () => clearTimeout(timer);
   }, []);
 
+  // The greeting covers part of the page (much of a phone screen): it leaves on its own after a while.
+  useEffect(() => {
+    if (!welcomeToast) return;
+    const t = setTimeout(() => setWelcomeToast(false), 12000);
+    return () => clearTimeout(t);
+  }, [welcomeToast]);
+
   const handleDismissToast = (e: React.MouseEvent) => {
     e.stopPropagation();
     setWelcomeToast(false);
@@ -924,7 +931,7 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
     <>
       {/* Welcome Speech Bubble with Smart Dismissal */}
       {welcomeToast && !open && (
-        <div className="animate-fade-up fixed bottom-20 right-5 z-40 max-w-xs rounded-2xl border border-gold/40 bg-card/95 p-4 shadow-lift backdrop-blur-md">
+        <div className="animate-fade-up fixed bottom-20 right-5 z-40 max-w-[17rem] rounded-2xl sm:max-w-xs border border-gold/40 bg-card/95 p-4 shadow-lift backdrop-blur-md">
           <div className="flex items-start gap-3">
             <img
               src={qimmiqAvatar}
@@ -949,7 +956,7 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
                 onClick={handleOpenAssistant}
               >
                 {isAdmin ? (
-                  <>⚡ <strong>Ops Copilot:</strong> Review today's revenue ($860 CAD), Van #1 freshwater (72%), and route stops. 🚐</>
+                  <>⚡ <strong>Ops Copilot:</strong> Ask about today's route, requests to confirm, revenue or vaccines due. 🚐</>
                 ) : (
                   <>👋 <strong>Hi there!</strong> I'm <strong>Qimmiq</strong>. Ask me about pricing for your dog's breed, Sunday appointments, or booking in Toronto. 🐾</>
                 )}
@@ -1325,7 +1332,7 @@ export function QimmiqAssistant({ isAdmin = false }: { isAdmin?: boolean }) {
             {checkoutStep === "review" ? (
               <div className="space-y-4">
                 <div className="border-b border-border pb-3">
-                  <div className="eyebrow text-gold">The Fresh Pooch · Express Checkout</div>
+                  <div className="eyebrow text-gold-deep">The Fresh Pooch · Express Checkout</div>
                   <h3 className="font-serif text-2xl font-bold">Review & Book Mobile Spa</h3>
                   <p className="text-xs text-muted-foreground">
                     100% cage-free mobile grooming at your Toronto doorstep.

@@ -6,7 +6,7 @@ import hero from "@/assets/hero-trailer.jpg";
 import beforeImg from "@/assets/before.jpg";
 import afterImg from "@/assets/after.jpg";
 import { cn } from "@/lib/utils";
-import { Chip, Pill, SectionTitle } from "./primitives";
+import { BrandSeal, Bubbles, Chip, Pill, SectionTitle } from "./primitives";
 import { Packages, PressBanner, Reviews, VanMoments, Faq, GOOGLE_RATING, PACKAGES, type PackageId } from "./PublicSections";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { PetParentAppSection } from "./PetParentAppSection";
@@ -341,11 +341,13 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
   };
   return (
     <div className="animate-fade-up">
+      <div className="relative isolate overflow-clip bg-[radial-gradient(70%_60%_at_8%_0%,var(--aqua-soft),transparent_70%),radial-gradient(45%_45%_at_100%_100%,var(--gold-soft),transparent_75%)]">
+      <Bubbles />
       <section className="mx-auto grid max-w-7xl gap-10 px-4 py-10 md:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
         <div className="flex flex-col justify-center">
           <Pill tone="gold" className="mb-5 self-start">Now booking Midtown • Annex • Rosedale</Pill>
           <h1 className="text-4xl font-semibold leading-[1.05] text-ink md:text-6xl">
-            Toronto's Premier Mobile Dog Spa <em className="font-normal text-teal">Right At Your Doorstep</em>
+            Toronto's Premier Mobile Dog Spa <em className="font-normal text-teal">Right At Your <span className="relative whitespace-nowrap">Doorstep<span className="absolute bottom-[0.06em] left-0 -z-10 h-[0.2em] w-full rounded-full bg-gradient-gold opacity-60" aria-hidden /></span></em>
           </h1>
           <p className="mt-5 max-w-xl text-lg text-muted-foreground">
             1-on-1 cage-free, stress-free grooming inside our custom vintage luxury mobile trailer.
@@ -360,7 +362,8 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
               <span key={t} className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-semibold"><I className="h-4 w-4 text-teal" />{t}</span>
             ))}
           </div>
-          <div className="relative mt-8 overflow-hidden rounded-3xl shadow-lift">
+          <div className="relative mt-8 mb-6">
+          <div className="relative overflow-hidden rounded-3xl shadow-lift ring-1 ring-aqua/20">
             <img
               src={hero}
               alt="The Fresh Pooch mobile dog grooming van in Toronto with open luxury spa door and goldendoodle"
@@ -377,6 +380,8 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
               100% Autonomous Spa
             </div>
           </div>
+          <BrandSeal className="absolute -bottom-7 -right-2 z-10 h-24 w-24 sm:h-32 sm:w-32 md:-right-5 md:h-36 md:w-36" />
+          </div>
         </div>
 
 
@@ -384,6 +389,7 @@ export function PublicSurface({ onOpenPortal }: { onOpenPortal?: () => void }) {
           <QuoteWizard preset={preset} />
         </div>
       </section>
+      </div>
 
       <Packages onSelect={select} />
       <SubscriptionSection />

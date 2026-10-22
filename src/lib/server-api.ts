@@ -757,9 +757,10 @@ async function staffResets(request: Request, env: Env, rawEnv: unknown): Promise
 async function currentAccount(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
   const db = bookingsDb(rawEnv);
   const email = await readSignedCookie(request, env, "client", CLIENT_COOKIE);
-  if (!db || !email) return json({ authenticated: false }, 401);
+  // "not signed in" is a normal answer for visitors, like /api/staff/session
+  if (!db || !email) return json({ authenticated: false });
   const row = await db.prepare("SELECT data FROM customers WHERE email = ?").bind(email).first<{ data: string }>();
-  if (!row) return json({ authenticated: false }, 401);
+  if (!row) return json({ authenticated: false });
   return accountResponse(db, JSON.parse(row.data) as CustomerProfile);
 }
 

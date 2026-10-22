@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SERVICES } from "@/lib/pricing";
 import { Check, Star, ChevronDown, Newspaper, ShieldCheck, Leaf, Award, Phone, Mail, Clock, MapPin, Instagram } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Pill, SectionTitle, BrandLogo } from "./primitives";
+import { Pill, SectionTitle, BrandSeal, Bubbles } from "./primitives";
 import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 import vanCollage from "@/assets/fresh-pooch-van-collage.jpg";
 
@@ -43,14 +43,18 @@ export function Packages({ onSelect }: { onSelect: (id: PackageId) => void }) {
 
 export function PressBanner() {
   return (
-    <section className="bg-ink text-ink-foreground">
-      <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-8 text-center md:px-6">
-        <div className="eyebrow flex items-center gap-2 text-gold"><Newspaper className="h-4 w-4" /> Trusted by Toronto Pet Parents & Featured on BlogTO</div>
-        <p className="max-w-3xl font-serif text-xl italic md:text-2xl">"The vintage spa trailer famously visited by Adam Sandler in Toronto for his bulldog Bagel's luxury groom."</p>
-        <div className="flex flex-wrap justify-center gap-2 text-xs font-semibold">
-          {[{ i: Award, t: "3,500+ Services Since 2019" }, { i: Leaf, t: "100% Organic, Hypoallergenic Shampoo" }, { i: ShieldCheck, t: "1-on-1, Cage-Free, at Your Door" }].map(({ i: I, t }) => (
-            <span key={t} className="flex items-center gap-1.5 rounded-full border border-gold/40 px-3 py-1.5"><I className="h-3.5 w-3.5 text-gold" />{t}</span>
-          ))}
+    <section className="relative isolate overflow-hidden bg-brand-dark text-ink-foreground">
+      <Bubbles className="opacity-50" />
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 px-4 py-12 text-center md:flex-row md:gap-10 md:px-6 md:py-14 md:text-left">
+        <BrandSeal decorative className="h-28 w-28 shrink-0 md:h-40 md:w-40" />
+        <div className="flex flex-col items-center gap-4 md:items-start">
+          <div className="eyebrow flex items-center gap-2 text-gold"><Newspaper className="h-4 w-4" /> Trusted by Toronto Pet Parents & Featured on BlogTO</div>
+          <p className="max-w-3xl font-serif text-xl italic leading-snug md:text-[1.7rem]">"The vintage spa trailer famously visited by Adam Sandler in Toronto for his bulldog Bagel's luxury groom."</p>
+          <div className="flex flex-wrap justify-center gap-2 text-xs font-semibold md:justify-start">
+            {[{ i: Award, t: "3,500+ Services Since 2019" }, { i: Leaf, t: "100% Organic, Hypoallergenic Shampoo" }, { i: ShieldCheck, t: "1-on-1, Cage-Free, at Your Door" }].map(({ i: I, t }) => (
+              <span key={t} className="flex items-center gap-1.5 rounded-full border border-aqua/40 bg-white/5 px-3 py-1.5"><I className="h-3.5 w-3.5 text-gold" />{t}</span>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -146,67 +150,78 @@ export function SiteFooter() {
   };
 
   return (
-    <footer className="border-t border-border bg-[#c89222]/10 md:bg-secondary/40">
-      <div className="mx-auto max-w-7xl px-4 py-12 text-sm md:px-6">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="relative isolate overflow-hidden bg-brand-dark text-white/70">
+      <div className="h-[3px] bg-[linear-gradient(90deg,var(--teal-deep),var(--aqua)_45%,var(--aqua)_75%,var(--gold))]" aria-hidden />
+      <div className="mx-auto max-w-7xl px-4 py-14 text-sm md:px-6">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.25fr_1fr_1fr_1.5fr]">
+          {/* Brand */}
+          <div className="flex flex-col items-start gap-4">
+            <BrandSeal className="h-24 w-24" />
+            <div>
+              <div className="font-serif text-2xl font-semibold text-white">The Fresh Pooch</div>
+              <div className="eyebrow mt-1 text-[0.62rem] text-aqua">Mobile Dog Wash & Grooming</div>
+            </div>
+            <p className="max-w-xs text-xs leading-relaxed text-white/60">1-on-1, cage-free grooming in our own spa van, parked at your door anywhere in Toronto since 2019.</p>
+          </div>
+
           {/* Quick Links */}
           <div>
-            <h4 className="font-serif text-lg font-semibold text-foreground">Quick links</h4>
-            <ul className="mt-4 space-y-2.5 text-muted-foreground text-sm">
+            <h4 className="font-serif text-lg font-semibold text-white">Quick links</h4>
+            <ul className="mt-4 space-y-2.5 text-white/65 text-sm">
               <li>
-                <a href="#quote" className="hover:text-teal transition-colors">Contact Us / Book Now</a>
+                <a href="#quote" className="hover:text-aqua transition-colors">Contact Us / Book Now</a>
               </li>
               <li>
-                <a href="#packages" className="hover:text-teal transition-colors">Who We Are</a>
+                <a href="#packages" className="hover:text-aqua transition-colors">Who We Are</a>
               </li>
               <li>
-                <a href="#faq" className="hover:text-teal transition-colors">Cancellation Policy</a>
+                <a href="#faq" className="hover:text-aqua transition-colors">Cancellation Policy</a>
               </li>
               <li>
-                <a href="#faq" className="hover:text-teal transition-colors">Privacy Policy</a>
+                <a href="#faq" className="hover:text-aqua transition-colors">Privacy Policy</a>
               </li>
               <li>
-                <a href="#subscriptions" className="hover:text-teal transition-colors">VIP Club & Sitemap</a>
+                <a href="#subscriptions" className="hover:text-aqua transition-colors">VIP Club & Sitemap</a>
               </li>
             </ul>
           </div>
 
           {/* BOOK NOW Contact */}
           <div>
-            <h4 className="font-serif text-lg font-semibold text-foreground">BOOK NOW</h4>
-            <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
+            <h4 className="font-serif text-lg font-semibold text-white">BOOK NOW</h4>
+            <ul className="mt-4 space-y-2.5 text-sm text-white/65">
               <li>
-                <span className="font-semibold text-foreground">Phone: </span>
-                <a href="tel:+16474511747" className="hover:text-teal transition-colors">647-451-1747</a>
+                <span className="font-semibold text-white">Phone: </span>
+                <a href="tel:+16474511747" className="hover:text-aqua transition-colors">647-451-1747</a>
               </li>
               <li>
-                <span className="font-semibold text-foreground">Whatsapp: </span>
+                <span className="font-semibold text-white">Whatsapp: </span>
                 <a
                   href="https://wa.me/16474511747"
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-teal transition-colors"
+                  className="hover:text-aqua transition-colors"
                 >
                   647-451-1747
                 </a>
               </li>
               <li>
-                <span className="font-semibold text-foreground">SMS: </span>
-                <a href="sms:+16474511747" className="hover:text-teal transition-colors">647-451-1747</a>
+                <span className="font-semibold text-white">SMS: </span>
+                <a href="sms:+16474511747" className="hover:text-aqua transition-colors">647-451-1747</a>
               </li>
               <li>
-                <span className="font-semibold text-foreground">Instagram: </span>
+                <span className="font-semibold text-white">Instagram: </span>
                 <a
                   href="https://instagram.com/thefreshpooch"
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-teal transition-colors"
+                  className="hover:text-aqua transition-colors"
                 >
                   @thefreshpooch
                 </a>
               </li>
               <li className="pt-2 text-xs">
-                <span className="inline-block rounded-full bg-teal/10 text-teal px-2.5 py-1 font-semibold">
+                <span className="inline-block rounded-lg bg-aqua/15 px-2.5 py-1 font-semibold leading-relaxed text-aqua">
                   ✓ Mon – Sun: 8:30 AM – 6:00 PM (Open 7 Days)
                 </span>
               </li>
@@ -214,9 +229,9 @@ export function SiteFooter() {
           </div>
 
           {/* Newsletter Subscription */}
-          <div className="lg:col-span-2">
-            <h4 className="font-serif text-lg font-semibold text-foreground">Subscribe to The Fresh Pooch:</h4>
-            <p className="mt-1 text-xs text-muted-foreground">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <h4 className="font-serif text-lg font-semibold text-white">Subscribe to The Fresh Pooch:</h4>
+            <p className="mt-1 text-xs text-white/65">
               Get secret promotional slots, seasonal Toronto paw care tips, and VIP member perks.
             </p>
             <form onSubmit={handleSubscribe} className="mt-4 flex flex-col sm:flex-row gap-2 max-w-md">
@@ -226,28 +241,28 @@ export function SiteFooter() {
                 value={subscribedEmail}
                 onChange={(e) => setSubscribedEmail(e.target.value)}
                 placeholder="Email address"
-                className="flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none transition focus:border-teal focus:ring-1 focus:ring-teal"
+                className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/45 outline-none transition focus:border-aqua focus:ring-1 focus:ring-aqua"
               />
               <button
                 type="submit"
-                className="rounded-xl bg-ink px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-ink-foreground transition hover:opacity-90"
+                className="rounded-xl bg-gradient-gold px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-ink transition hover:opacity-90"
               >
                 {subscribedDone ? "✓ Subscribed!" : "SUBSCRIBE"}
               </button>
             </form>
             {subscribedDone && (
-              <p className="mt-2 text-xs font-semibold text-success">
+              <p className="mt-2 text-xs font-semibold text-aqua">
                 🎉 Welcome to the pack! Check your inbox for a special welcome treat.
               </p>
             )}
-            <div className="mt-5 text-xs text-muted-foreground">
-              <strong className="text-foreground">Service Hub:</strong> East York, Etobicoke, North York, York, Midtown, Downtown, Annex, Rosedale, Leaside, plus Mississauga, Markham, Scarborough & Richmond Hill.
+            <div className="mt-5 text-xs text-white/65">
+              <strong className="text-white">Service Hub:</strong> East York, Etobicoke, North York, York, Midtown, Downtown, Annex, Rosedale, Leaside, plus Mississauga, Markham, Scarborough & Richmond Hill.
             </div>
           </div>
         </div>
 
         {/* Bottom Bar: Canadian Payment Badges & Social Media Icons */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-border pt-8 sm:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-white/10 pt-8 sm:flex-row">
           {/* Payment Badges (Canada Most Recurring Methods) */}
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
             {/* Amex */}
@@ -292,7 +307,7 @@ export function SiteFooter() {
               target="_blank"
               rel="noreferrer"
               aria-label="Facebook The Fresh Pooch"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-foreground hover:bg-teal hover:text-white transition shadow-sm"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-aqua hover:bg-aqua hover:text-ink"
             >
               <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
@@ -303,7 +318,7 @@ export function SiteFooter() {
               target="_blank"
               rel="noreferrer"
               aria-label="Instagram The Fresh Pooch"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-card border border-border text-foreground hover:bg-teal hover:text-white transition shadow-sm"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-aqua hover:bg-aqua hover:text-ink"
             >
               <Instagram className="h-4 w-4" />
             </a>
@@ -311,7 +326,7 @@ export function SiteFooter() {
         </div>
 
         {/* Copyright */}
-        <div className="mt-6 border-t border-border/50 pt-4 text-center text-xs text-muted-foreground">
+        <div className="mt-6 border-t border-white/10 pt-4 text-center text-xs text-white/50">
           © 2026, TorontoDogGrooming Powered by The Fresh Pooch Mobile Spa • All Rights Reserved
         </div>
       </div>
