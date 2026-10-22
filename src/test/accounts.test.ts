@@ -127,3 +127,33 @@ describe("password reset (server, SQLite)", () => {
     expect(newLogin!.status).toBe(200);
   });
 });
+
+describe("owner sign-in set from the dashboard (server, SQLite)", () => {
+  it("replaces the starter password, accepts the new email and switches the app to live data", async () => {
+    const env = { STAFF_PASSWORD: "starter-pass", DEMO_STAFF_ACCESS: "true", BOOKINGS_DB: sqliteD1() };
+    const login = (email: string, password: string) => handleApi(req("/api/staff/login", { method: "POST", body: JSON.stringify({ email, password }) }), env);
+    const config = async () => (await (await handleApi(req("/api/staff/config"), env))!.json()) as { live: boolean; demoAccess: boolean };
+
+    expect(await config()).toMatchObject({ live: false, demoAccess: true });
+    const starter = await login("admin@thefreshpooch.ca", "starter-pass");
+    expect(starter!.status).toBe(200);
+    const cookie = cookieOf(starter!);
+
+    const update = (body: object, headers: Record<string, string> = { cookie }) =>
+      handleApi(req("/api/staff/account", { method: "POST", headers, body: JSON.stringify(body) }), env);
+    expect((await update({ currentPassword: "starter-pass", newPassword: "x", email: "hello@doggroomingtoronto.ca" }))!.status).toBe(400);
+    expect((await update({ currentPassword: "wrong", newPassword: "her-own-pass-2026", email: "hello@doggroomingtoronto.ca" }))!.status).toBe(401);
+    expect((await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026", email: "me@gmail.com" }))!.status).toBe(400);
+    expect((await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026" }, {}))!.status).toBe(401);
+    const saved = await update({ currentPassword: "starter-pass", newPassword: "her-own-pass-2026", email: "Angelica@DogGroomingToronto.ca" });
+    expect(saved!.status).toBe(200);
+
+    expect(await config()).toMatchObject({ live: true, demoAccess: false });
+    expect((await login("admin@thefreshpooch.ca", "starter-pass"))!.status).toBe(401);
+    const own = await login("angelica@doggroomingtoronto.ca", "her-own-pass-2026");
+    expect(own!.status).toBe(200);
+    const session = await handleApi(req("/api/staff/session", { headers: { cookie: cookieOf(own!) } }), env);
+    expect(await session!.json()).toMatchObject({ authenticated: true, email: "angelica@doggroomingtoronto.ca" });
+    expect((await handleApi(req("/api/staff/demo-login", { method: "POST" }), env))!.status).toBe(403);
+  });
+});

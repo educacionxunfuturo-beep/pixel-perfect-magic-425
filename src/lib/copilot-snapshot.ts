@@ -1,4 +1,4 @@
-import { addDays, formatDate, routeForDate, serviceName, sortByTime, torontoToday, type Appointment } from "./appointments";
+import { addDays, formatDate, routeForDate, serviceName, sortByTime, torontoToday, usesSampleData, type Appointment } from "./appointments";
 import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "./dashboard-stats";
 
 /**
@@ -15,7 +15,7 @@ function stopLine(a: Appointment): string {
   return `  - ${a.time} ${a.petName} (${a.breed}, ${a.weightLbs} lbs) · ${serviceName(a.service)} · ${money(a.total)} · status ${a.status}${a.latchkeyCode ? " · Latchkey access" : ""}${temperament}`;
 }
 
-export function buildOpsSnapshot(appointments: Appointment[], today = torontoToday()): string {
+export function buildOpsSnapshot(appointments: Appointment[], today = torontoToday(), sample = usesSampleData()): string {
   const route = routeForDate(today);
   const todays = sortByTime(appointments.filter((a) => a.date === today && a.status !== "cancelled" && a.status !== "requested"));
   const done = todays.filter((a) => a.status === "completed");
@@ -38,8 +38,12 @@ export function buildOpsSnapshot(appointments: Appointment[], today = torontoTod
     `Route fill this month (6 stops per route day): ${zones}.`,
     `Upcoming bookings from the portal and website (${upcomingBookings(appointments, today).length}, ${requests} still awaiting confirmation):`,
     upcoming.length ? upcoming.map((a) => `  - ${formatDate(a.date)} ${a.timeWindow ?? a.time} ${a.petName} (${a.breed || "breed not given"}) · ${serviceName(a.service)} · ${money(a.total)} · ${a.status} · from ${a.source}`).join("\n") : "  - none",
-    "Vaccine records: Barnaby (#FP-0428) Rabies valid to Nov 20 2026, DHPP valid to Jan 15 2027, Bordetella expires Oct 24 2026 (booster due). Other dogs have no certificates uploaded yet.",
+    ...(sample
+      ? ["Vaccine records: Barnaby (#FP-0428) Rabies valid to Nov 20 2026, DHPP valid to Jan 15 2027, Bordetella expires Oct 24 2026 (booster due). Other dogs have no certificates uploaded yet."]
+      : []),
     "Google rating: 4.8 from 164 reviews (public Google Maps figure, Oct 2026; not updated live).",
-    "Sample figures (not connected to live data yet): 54 VIP members, Van #1 fuel 72%, water tank full, next service Dec 12.",
+    sample
+      ? "Sample figures (not connected to live data yet): 54 VIP members, Van #1 fuel 72%, water tank full, next service Dec 12."
+      : "Not tracked by the app: VIP membership counts and van telemetry (fuel, water, service). Say so if asked.",
   ].join("\n");
 }

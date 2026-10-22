@@ -8,6 +8,8 @@ export interface StaffConfig {
   signInEnabled: boolean;
   demoAccess: boolean;
   demoHint?: string;
+  /** The owner set her own sign-in: the app shows real data only, no sample figures. */
+  live?: boolean;
 }
 
 /** Business domains: only these emails are sent to the staff sign-in. */
@@ -76,6 +78,15 @@ export async function staffLogout(): Promise<void> {
   await post("/api/staff/logout").catch(() => undefined);
   setStaffHint(false);
   refreshBookings();
+}
+
+/** Replaces the starter password with the owner's own (and optionally her sign-in email). */
+export async function updateOwnerAccount(input: { currentPassword: string; newPassword: string; email: string }): Promise<string> {
+  const res = await post("/api/staff/account", input);
+  if (!res.ok) throw new Error(await errorMessage(res, "Could not save the new sign-in."));
+  setStaffHint(true);
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("fp-business-live"));
+  return ((await res.json()) as { email: string }).email;
 }
 
 export async function getStaffSession(): Promise<{ authenticated: boolean; email?: string }> {

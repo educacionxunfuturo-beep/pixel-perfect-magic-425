@@ -269,12 +269,42 @@ function writeLocal(store: LocalStore) {
   window.dispatchEvent(new Event(CHANGED_EVENT));
 }
 
+// The demo seeds sample bookings; once the owner sets her own sign-in (/api/staff/config "live")
+// only real bookings remain. Checked once per page load.
+let sampleData = true;
+let modeCheck: Promise<void> | null = null;
+
+function ensureMode(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  modeCheck ??= fetch("/api/staff/config")
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((c: { live?: boolean }) => {
+      sampleData = !c.live;
+    })
+    .catch(() => undefined);
+  return modeCheck;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("fp-business-live", () => {
+    sampleData = false;
+    modeCheck = Promise.resolve();
+    window.dispatchEvent(new Event(CHANGED_EVENT));
+  });
+}
+
+/** True while the app shows the demo's sample bookings and figures. */
+export function usesSampleData(): boolean {
+  return sampleData;
+}
+
 /** Loads the local store, re-seeding the route and sample history when the day changes. */
 function loadLocal(today = torontoToday()): LocalStore {
+  const tag = sampleData ? today : `${today}:live`;
   const existing = readLocal();
-  if (existing && existing.seededFor === today) return existing;
+  if (existing && existing.seededFor === tag) return existing;
   const keep = (existing?.appointments ?? []).filter((a) => a.source === "portal" || a.source === "web");
-  const store = { seededFor: today, appointments: [...sampleHistory(today), ...todaysRoute(today), ...keep] };
+  const store = { seededFor: tag, appointments: sampleData ? [...sampleHistory(today), ...todaysRoute(today), ...keep] : keep };
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(store));
@@ -477,6 +507,7 @@ export async function listAppointments(): Promise<Appointment[]> {
     const list = await apiJson<ApiAppointment[]>("/booking/appointments");
     return sortByTime(list.map(fromApi));
   }
+  await ensureMode();
   const shared = await fetchSharedBookings();
   return sortByTime(mergeShared(loadLocal().appointments, shared));
 }
@@ -487,6 +518,7 @@ export async function createAppointment(input: NewAppointment): Promise<Appointm
     window.dispatchEvent(new Event(CHANGED_EVENT));
     return created;
   }
+  await ensureMode();
   const store = loadLocal();
   const appt: Appointment = {
     ...input,
@@ -515,6 +547,7 @@ export async function updateAppointment(id: string, patch: Partial<Pick<Appointm
     window.dispatchEvent(new Event(CHANGED_EVENT));
     return;
   }
+  await ensureMode();
   if (sharedAccess) {
     try {
       // 404 for route stops that only live on this device

@@ -11,7 +11,8 @@ import { StaffAlerts } from "./StaffAlerts";
 import { GOOGLE_RATING } from "./PublicSections";
 import { formatDate, serviceName, torontoToday, updateAppointment, useAppointments, type Appointment } from "@/lib/appointments";
 import { monthKpis, upcomingBookings, weekBars, zoneCoverage } from "@/lib/dashboard-stats";
-import { getStaffConfig, looksLikeStaffEmail, staffDemoLogin, staffLogin, staffLogout, type StaffConfig } from "@/lib/staff-session";
+import { getStaffConfig, getStaffSession, looksLikeStaffEmail, staffDemoLogin, staffLogin, staffLogout, type StaffConfig } from "@/lib/staff-session";
+import { OwnerAccount } from "./OwnerAccount";
 
 // Not tracked by the appointment store yet: sample figures for the demo.
 const SAMPLE_VIP_MEMBERS = { value: "54", delta: "+8 this month" };
@@ -67,6 +68,12 @@ export function AdminSurface({
   useEffect(() => {
     getStaffConfig().then(setConfig);
   }, []);
+  // live = the owner set her own sign-in: no sample figures, only real bookings
+  const live = Boolean(config?.live);
+  const [sessionEmail, setSessionEmail] = useState("");
+  useEffect(() => {
+    if (isAuthenticated) getStaffSession().then((s) => setSessionEmail(s.email ?? ""));
+  }, [isAuthenticated]);
 
   // The password is checked by the server; a pet-parent email is sent to the Customer Portal instead.
   const handleLogin = async (e?: React.FormEvent) => {
@@ -138,8 +145,17 @@ export function AdminSurface({
   const KPIS = [
     { label: `Revenue (${kpi.monthLabel})`, value: money(kpi.revenue), delta: changeLabel(kpi.revenueChange), up: (kpi.revenueChange ?? 0) >= 0, icon: DollarSign },
     { label: "Grooms Completed", value: String(kpi.grooms), delta: changeLabel(kpi.groomsChange), up: (kpi.groomsChange ?? 0) >= 0, icon: CalendarDays },
-    { label: "Active VIP Members", value: SAMPLE_VIP_MEMBERS.value, delta: SAMPLE_VIP_MEMBERS.delta, up: true, icon: Users },
+    live
+      ? { label: "Upcoming Bookings", value: String(upcoming.length), delta: `${pending.length} to confirm`, up: true, icon: Users }
+      : { label: "Active VIP Members", value: SAMPLE_VIP_MEMBERS.value, delta: SAMPLE_VIP_MEMBERS.delta, up: true, icon: Users },
     { label: "Avg. Google Rating", value: GOOGLE_RATING.value, delta: `${GOOGLE_RATING.reviews} reviews`, up: true, icon: Star },
+  ];
+  // Real figures for the side card once the business is live (van telemetry is not connected).
+  const todays = appointments.filter((a) => a.date === today && a.status !== "cancelled" && a.status !== "requested");
+  const todayCards = [
+    { label: "Bookings today", value: String(todays.length), icon: CalendarDays, note: `${todays.filter((a) => a.status === "completed").length} completed` },
+    { label: "Waiting for your confirmation", value: String(pending.length), icon: Users, note: pending.length ? "See Upcoming bookings" : "All caught up" },
+    { label: "Van sensors", value: "Not connected", icon: Wrench, note: "Fuel and water are not tracked yet" },
   ];
   const maxRev = Math.max(1, ...WEEK.map((d) => d.revenue));
   const bestDay = WEEK.reduce((best, d) => (d.revenue > best.revenue ? d : best), WEEK[0]!);
@@ -248,7 +264,7 @@ export function AdminSurface({
         <div className="flex items-center gap-2.5 text-xs">
           <ShieldCheck className="h-4 w-4 text-teal" />
           <span className="font-semibold text-foreground">Secure Admin Session:</span>
-          <span className="text-muted-foreground">Logged in as Operations Director (<code className="font-mono">admin@thefreshpooch.ca</code>)</span>
+          <span className="text-muted-foreground">Logged in as Operations Director (<code className="font-mono">{sessionEmail || "owner"}</code>)</span>
           <Pill tone="success" className="ml-1 text-[10px]">Open 7 Days Active</Pill>
         </div>
         <div className="flex items-center gap-2">
@@ -282,6 +298,13 @@ export function AdminSurface({
             <a href="#upcoming-bookings" onClick={() => setNewRequests(0)} className="rounded-full bg-ink px-4 py-1.5 text-xs font-bold text-ink-foreground">Review now</a>
             <button onClick={() => setNewRequests(0)} className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Dismiss</button>
           </span>
+        </div>
+      )}
+
+      {config && !live && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-gold-soft px-5 py-3 text-sm">
+          <span><strong>Demo mode:</strong> the figures below include sample bookings. Set your own password and the dashboard shows only your real bookings.</span>
+          <a href="#owner-account" className="rounded-full bg-ink px-4 py-1.5 text-xs font-bold text-ink-foreground">Make it mine</a>
         </div>
       )}
 
@@ -354,9 +377,9 @@ export function AdminSurface({
         </div>
 
         <div className="card-surface p-6">
-          <h2 className="text-2xl font-semibold">Van #1 health</h2>
+          <h2 className="text-2xl font-semibold">{live ? "Today on the route" : "Van #1 health"}</h2>
           <div className="mt-4 space-y-3">
-            {VAN.map((v) => {
+            {(live ? todayCards : VAN).map((v) => {
               const I = v.icon;
               return (
                 <div key={v.label} className="flex items-center gap-4 rounded-xl border border-border p-4">
@@ -426,6 +449,11 @@ export function AdminSurface({
       <StaffAlerts />
 
       <AdminResets />
+
+      <OwnerAccount email={sessionEmail} live={live} onSaved={(saved) => {
+        setSessionEmail(saved);
+        setConfig((c) => (c ? { ...c, live: true, demoAccess: false } : c));
+      }} key={sessionEmail ? "ready" : "loading"} />
 
       <div className="mt-6">
         <SectionTitle eyebrow="Route Density" title="Zone coverage this month" sub="Where the trailer parks, and how full each route day is." />

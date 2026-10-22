@@ -5,7 +5,9 @@ import { sendPush, type VapidKeys } from "./web-push";
  * Server-only API routes, served by the Cloudflare Worker (src/server.ts).
  * Everything secret lives here, never in the browser bundle:
  *
- *   STAFF_PASSWORD      secret  staff sign-in password (sign-in is disabled while unset)
+ *   STAFF_PASSWORD      secret  starter staff password; once the owner sets her own in the dashboard
+ *                               (table settings, key 'owner') only that one works. Keep it set: it also
+ *                               derives the session key while SESSION_SECRET is unset.
  *   SESSION_SECRET      secret  optional; signs staff sessions (falls back to a key derived from STAFF_PASSWORD)
  *   STAFF_EMAILS        var     comma-separated staff emails (default: admin@thefreshpooch.ca, hello@doggroomingtoronto.ca)
  *   DEMO_STAFF_ACCESS   var     "true" on the public demo: enables one-click demo sign-in
@@ -134,6 +136,59 @@ async function createSession(env: Env, email: string, request: Request): Promise
   return `${SESSION_COOKIE}=${payload}.${sig}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_SECONDS}${secure}`;
 }
 
+// ---------- owner account (set by the owner from the dashboard) ----------
+
+interface OwnerAccount {
+  email: string;
+  hash: string;
+  salt: string;
+  updatedAt: string;
+}
+
+async function ownerAccount(rawEnv: unknown): Promise<OwnerAccount | null> {
+  const db = bookingsDb(rawEnv);
+  if (!db) return null;
+  try {
+    const row = await db.prepare("SELECT value FROM settings WHERE key = 'owner'").bind().first<{ value: string }>();
+    return row ? (JSON.parse(row.value) as OwnerAccount) : null;
+  } catch {
+    return null; // table not created yet (migration 0005)
+  }
+}
+
+async function staffPasswordMatches(env: Env, owner: OwnerAccount | null, password: string): Promise<boolean> {
+  if (owner) return sameBytes(enc.encode((await hashPassword(password, owner.salt)).hash), enc.encode(owner.hash));
+  const starter = env["STAFF_PASSWORD"];
+  return Boolean(starter) && sameBytes(await sha256(password), await sha256(starter!));
+}
+
+/** The owner replaces the starter password and may set her own sign-in email. */
+async function updateOwnerAccount(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  const session = await readStaffSession(request, rawEnv);
+  if (!session) return json({ error: "Staff sign-in required." }, 401);
+  const db = bookingsDb(rawEnv);
+  if (!db) return json({ error: "Settings are not available on this server." }, 503);
+  if (rateLimited(`owner-account:${clientIp(request)}`, 5, 15 * 60 * 1000)) return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
+  const body = ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+  const current = String(body["currentPassword"] ?? "");
+  const next = String(body["newPassword"] ?? "");
+  const owner = await ownerAccount(rawEnv);
+  const email = String(body["email"] ?? owner?.email ?? session.email).trim().toLowerCase().slice(0, 120);
+  if (!(await staffPasswordMatches(env, owner, current))) return json({ error: "The current password is not correct." }, 401);
+  if (next.length < 10 || next.length > 200) return json({ error: "Choose a new password of at least 10 characters." }, 400);
+  if (next === current) return json({ error: "The new password must be different from the current one." }, 400);
+  // the sign-in screen sends only business-domain emails to the staff login (looksLikeStaffEmail)
+  if (!/^[^\s@]+@(thefreshpooch\.ca|doggroomingtoronto\.ca)$/.test(email)) return json({ error: "Use an @thefreshpooch.ca or @doggroomingtoronto.ca email." }, 400);
+  const { hash, salt } = await hashPassword(next);
+  const value: OwnerAccount = { email, hash, salt, updatedAt: new Date().toISOString() };
+  await db
+    .prepare("INSERT INTO settings (key, value) VALUES ('owner', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .bind(JSON.stringify(value))
+    .run();
+  const cookie = await createSession(env, email, request);
+  return json({ ok: true, email }, 200, cookie ? { "set-cookie": cookie } : {});
+}
+
 export async function readStaffSession(request: Request, rawEnv: unknown): Promise<{ email: string } | null> {
   const env = readEnv(rawEnv);
   const cookie = request.headers.get("cookie") ?? "";
@@ -144,33 +199,36 @@ export async function readStaffSession(request: Request, rawEnv: unknown): Promi
   if (!payload || !sig || !key) return null;
   const sigBytes = Uint8Array.from(fromB64url(sig), (c) => c.charCodeAt(0));
   if (!(await crypto.subtle.verify("HMAC", key, sigBytes, enc.encode(payload)))) return null;
+  let data: { email: string; exp: number; kind?: string };
   try {
-    const data = JSON.parse(fromB64url(payload)) as { email: string; exp: number; kind?: string };
-    if (data.exp < Date.now() / 1000 || (data.kind ?? "staff") !== "staff" || !staffEmails(env).includes(data.email)) return null;
-    return { email: data.email };
+    data = JSON.parse(fromB64url(payload)) as { email: string; exp: number; kind?: string };
   } catch {
     return null;
   }
+  if (data.exp < Date.now() / 1000 || (data.kind ?? "staff") !== "staff") return null;
+  if (!staffEmails(env).includes(data.email) && (await ownerAccount(rawEnv))?.email !== data.email) return null;
+  return { email: data.email };
 }
 
 const clearCookie = `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 
-async function staffLogin(request: Request, env: Env): Promise<Response> {
+async function staffLogin(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
   if (rateLimited(`login:${clientIp(request)}`, 10, 10 * 60 * 1000)) {
     return json({ error: "Too many sign-in attempts. Try again in a few minutes." }, 429);
   }
-  const password = env["STAFF_PASSWORD"];
-  if (!password) return json({ error: "Staff sign-in is not configured on this server." }, 503);
+  const owner = await ownerAccount(rawEnv);
+  if (!owner && !env["STAFF_PASSWORD"]) return json({ error: "Staff sign-in is not configured on this server." }, 503);
   const body = (await request.json().catch(() => ({}))) as { email?: string; password?: string };
   const email = (body.email ?? "").trim().toLowerCase();
-  const ok = staffEmails(env).includes(email) && sameBytes(await sha256(body.password ?? ""), await sha256(password));
+  const knownEmail = staffEmails(env).includes(email) || owner?.email === email;
+  const ok = knownEmail && (await staffPasswordMatches(env, owner, body.password ?? ""));
   if (!ok) return json({ error: "Wrong email or password." }, 401);
   const cookie = await createSession(env, email, request);
   return json({ email }, 200, cookie ? { "set-cookie": cookie } : {});
 }
 
-async function staffDemoLogin(request: Request, env: Env): Promise<Response> {
-  if (env["DEMO_STAFF_ACCESS"] !== "true") return json({ error: "Demo access is disabled." }, 403);
+async function staffDemoLogin(request: Request, env: Env, rawEnv: unknown): Promise<Response> {
+  if (env["DEMO_STAFF_ACCESS"] !== "true" || (await ownerAccount(rawEnv))) return json({ error: "Demo access is disabled." }, 403);
   const email = staffEmails(env)[0]!;
   const cookie = await createSession(env, email, request);
   if (!cookie) return json({ error: "Staff sign-in is not configured on this server." }, 503);
@@ -774,15 +832,18 @@ export async function handleApi(request: Request, rawEnv: unknown): Promise<Resp
   const method = request.method;
 
   if (pathname === "/api/staff/config" && method === "GET") {
-    const demo = env["DEMO_STAFF_ACCESS"] === "true";
-    return json({ signInEnabled: Boolean(env["STAFF_PASSWORD"]), demoAccess: demo, ...(demo && env["DEMO_STAFF_HINT"] ? { demoHint: env["DEMO_STAFF_HINT"] } : {}) });
+    // live: the owner set her own sign-in, so the app shows real data only (no sample figures)
+    const live = Boolean(await ownerAccount(rawEnv));
+    const demo = env["DEMO_STAFF_ACCESS"] === "true" && !live;
+    return json({ signInEnabled: live || Boolean(env["STAFF_PASSWORD"]), demoAccess: demo, live, ...(demo && env["DEMO_STAFF_HINT"] ? { demoHint: env["DEMO_STAFF_HINT"] } : {}) });
   }
   if (pathname === "/api/staff/session" && method === "GET") {
     const session = await readStaffSession(request, rawEnv);
     return json(session ? { authenticated: true, email: session.email } : { authenticated: false });
   }
-  if (pathname === "/api/staff/login" && method === "POST") return staffLogin(request, env);
-  if (pathname === "/api/staff/demo-login" && method === "POST") return staffDemoLogin(request, env);
+  if (pathname === "/api/staff/login" && method === "POST") return staffLogin(request, env, rawEnv);
+  if (pathname === "/api/staff/demo-login" && method === "POST") return staffDemoLogin(request, env, rawEnv);
+  if (pathname === "/api/staff/account" && method === "POST") return updateOwnerAccount(request, env, rawEnv);
   if (pathname === "/api/staff/logout" && method === "POST") return json({ ok: true }, 200, { "set-cookie": clearCookie });
   if (pathname === "/api/notifications/sms" && method === "POST") return sendSms(request, env);
   if (pathname === "/api/qimmiq/status" && method === "GET") return json({ configured: Boolean(env["GEMINI_API_KEY"]) });
