@@ -421,7 +421,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                   <label className="flex items-start gap-2.5 rounded-xl border border-border bg-secondary/40 p-3 text-xs text-muted-foreground">
                     <input type="checkbox" required checked={signupConsent} onChange={(e) => setSignupConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--teal)]" />
                     <span>
-                      I agree to the <a href="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-teal underline">Privacy Policy</a> and allow The Fresh Pooch to keep my contact details, my dog's records, access code and vaccine certificates to provide the grooming service. I can download or delete my data at any time.
+                      I agree to the <a href="/privacy" target="_blank" rel="noreferrer" className="font-semibold text-teal underline">Privacy Policy</a> and the <a href="/terms" target="_blank" rel="noreferrer" className="font-semibold text-teal underline">Terms of Use</a>, and allow The Fresh Pooch to keep my contact details, my dog's records, access code and vaccine certificates to provide the grooming service. I can download or delete my data at any time.
                     </span>
                   </label>
                 )}

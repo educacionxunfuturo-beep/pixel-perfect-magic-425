@@ -181,6 +181,9 @@ export function SiteFooter() {
                 <a href="/privacy" className="hover:text-aqua transition-colors">Privacy Policy</a>
               </li>
               <li>
+                <a href="/terms" className="hover:text-aqua transition-colors">Terms of Use</a>
+              </li>
+              <li>
                 <a href="/privacy#cookies" className="hover:text-aqua transition-colors">Cookies</a>
               </li>
               <li>
@@ -214,6 +217,10 @@ export function SiteFooter() {
               <li>
                 <span className="font-semibold text-white">SMS: </span>
                 <a href="sms:+16474511747" className="hover:text-aqua transition-colors">647-451-1747</a>
+              </li>
+              <li>
+                <span className="font-semibold text-white">Email: </span>
+                <a href="mailto:DogGroomingToronto@gmail.com" className="hover:text-aqua transition-colors">DogGroomingToronto@gmail.com</a>
               </li>
               <li>
                 <span className="font-semibold text-white">Instagram: </span>
