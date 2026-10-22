@@ -293,6 +293,11 @@ if (typeof window !== "undefined") {
   });
 }
 
+/** Resolves once the app knows whether it shows sample data (see usesSampleData). */
+export function whenDataModeKnown(): Promise<void> {
+  return ensureMode();
+}
+
 /** True while the app shows the demo's sample bookings and figures. */
 export function usesSampleData(): boolean {
   return sampleData;

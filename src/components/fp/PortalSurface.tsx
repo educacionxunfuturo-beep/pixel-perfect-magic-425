@@ -16,7 +16,7 @@ import { dispatchNotification } from "@/lib/notifications";
 import { useLiveGroomCounter } from "@/lib/useLiveGroomCounter";
 import { looksLikeStaffEmail, markStaffSignedIn, staffLogin } from "@/lib/staff-session";
 import { SERVICES, SERVICE_IDS, ADDONS, type ServiceId } from "@/lib/pricing";
-import { TIME_WINDOWS, addDays, createAppointment, formatDate, priceFor, torontoToday, type AppointmentStatus } from "@/lib/appointments";
+import { TIME_WINDOWS, addDays, createAppointment, formatDate, priceFor, torontoToday, usesSampleData, whenDataModeKnown, type AppointmentStatus } from "@/lib/appointments";
 
 interface PetProfile {
   id: string;
@@ -130,6 +130,19 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
   const [loginPassword, setLoginPassword] = useState("demo-pass");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
+  // The sample pet parent exists only in the demo: once the business is live the form starts empty.
+  const [demoMode, setDemoMode] = useState(true);
+  useEffect(() => {
+    void whenDataModeKnown().then(() => {
+      if (usesSampleData()) return;
+      setDemoMode(false);
+      setUserEmail((e) => (e === DEMO_CLIENT_EMAIL ? "" : e));
+      setUserName((n) => (n === "Jordan Miller" ? "" : n));
+      setUserPhone((p) => (p === "(416) 555-0199" ? "" : p));
+      setUserAddress((a) => (a.startsWith("142 Roehampton") ? "" : a));
+      setLoginPassword((p) => (p === "demo-pass" ? "" : p));
+    });
+  }, []);
 
   // Real pet-parent account (checked by the server); null while using the sample demo account.
   const [account, setAccount] = useState<ClientAccount | null>(null);
@@ -289,7 +302,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                     }
                     return;
                   }
-                  if (authMode === "login" && userEmail.trim().toLowerCase() === DEMO_CLIENT_EMAIL) {
+                  if (demoMode && authMode === "login" && userEmail.trim().toLowerCase() === DEMO_CLIENT_EMAIL) {
                     // the sample pet parent: full demo portal, no server account
                     setIsAuthenticated(true);
                     return;
@@ -414,7 +427,7 @@ export function PortalSurface({ onAdminLogin }: { onAdminLogin?: () => void }) {
                 )}
                 {loginError && <p className="text-xs font-semibold text-destructive">{loginError}</p>}
                 {authNotice && <p className="rounded-xl bg-success-soft px-3 py-2 text-xs font-semibold text-success">{authNotice}</p>}
-                {authMode === "login" && (
+                {authMode === "login" && demoMode && (
                   <p className="text-[11px] text-muted-foreground">
                     Just looking? The sample account <strong>{DEMO_CLIENT_EMAIL}</strong> (password <strong>demo-pass</strong>) opens a portal full of example data.
                   </p>
